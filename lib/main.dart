@@ -13,14 +13,26 @@ void main() {
   );
 }
 
-class HSoundApp extends StatelessWidget {
+class HSoundApp extends StatefulWidget {
   const HSoundApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final repo = context.watch<MockRepository>();
-    final router = createRouter(repo);
+  State<HSoundApp> createState() => _HSoundAppState();
+}
 
+class _HSoundAppState extends State<HSoundApp> {
+  late final router;
+
+  @override
+  void initState() {
+    super.initState();
+    // Leemos el repositorio UNA SOLA VEZ al arrancar
+    final repo = context.read<MockRepository>();
+    router = createRouter(repo);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'HSound',
       theme: AppTheme.darkTheme,

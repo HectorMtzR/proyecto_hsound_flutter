@@ -12,6 +12,7 @@ import '../mock/mock_repository.dart';
 GoRouter createRouter(MockRepository repo) {
   return GoRouter(
     initialLocation: '/home',
+    refreshListenable: repo,
     redirect: (context, state) {
       final isLoggedIn = repo.currentUser != null;
       final isLoggingIn = state.matchedLocation == '/login';
