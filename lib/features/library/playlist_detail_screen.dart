@@ -36,7 +36,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                   title: Text(track.title),
                   subtitle: Text(track.artist),
                   trailing: const Icon(Icons.more_vert),
-                  onTap: () => repo.playTrack(track),
+                  onTap: () => repo.playTrackContext(track, playlist.tracks, playlistId: playlist.id),
                 );
               },
             ),

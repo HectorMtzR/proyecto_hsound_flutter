@@ -29,7 +29,7 @@ class HomeScreen extends StatelessWidget {
           final isPlaying = repo.currentTrack?.id == track.id;
 
           return GestureDetector(
-            onTap: () => repo.playTrack(track),
+            onTap: () => repo.playTrackContext(track, repo.allTracks),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
