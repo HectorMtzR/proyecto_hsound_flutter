@@ -26,10 +26,10 @@ class MockRepository extends ChangeNotifier {
   // Lista de prueba simulada
   final List<Map<String, dynamic>> _mockDatabaseResponse = [
     {'id': 't_0', 'title': '4:44', 'artist': 'Yan Block', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/444_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/444.mp3', 'duration': '4:44'},
-    {'id': 't_1', 'title': 'Beat It', 'artist': 'Michael Jackson', 'coverUrl': 'https://picsum.photos/seed/1/200', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/beatit.mp3', 'duration': '4:18'},
-    {'id': 't_2', 'title': 'Besos al Aire', 'artist': '3BallMTY, América Sierra, Smoky', 'coverUrl': 'https://picsum.photos/seed/2/200', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/besosalaire.mp3', 'duration': '3:15'},
-    {'id': 't_3', 'title': 'Big Ass Bracelet', 'artist': 'Westside Gunn', 'coverUrl': 'https://picsum.photos/seed/3/200', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/bigassbracelet.mp3', 'duration': '3:20'},
-    {'id': 't_4', 'title': 'C.R.E.A.M.', 'artist': 'Wu-Tang Clan', 'coverUrl': 'https://picsum.photos/seed/4/200', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/cream.mp3', 'duration': '4:12'},
+    {'id': 't_1', 'title': 'Beat It', 'artist': 'Michael Jackson', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/beatit_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/beatit.mp3', 'duration': '4:18'},
+    {'id': 't_2', 'title': 'Besos al Aire', 'artist': '3BallMTY, América Sierra, Smoky', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/besosalaire_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/besosalaire.mp3', 'duration': '3:15'},
+    {'id': 't_3', 'title': 'Big Ass Bracelet', 'artist': 'Westside Gunn', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/bigassbracelet_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/bigassbracelet.mp3', 'duration': '3:20'},
+    {'id': 't_4', 'title': 'C.R.E.A.M.', 'artist': 'Wu-Tang Clan', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/cream_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/cream.mp3', 'duration': '4:12'},
     {'id': 't_5', 'title': 'Cuando No Era Cantante', 'artist': 'El Bogueto, Yung Beef', 'coverUrl': 'https://picsum.photos/seed/5/200', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/cuandonoeracantante.mp3', 'duration': '3:45'},
     {'id': 't_6', 'title': 'Cult of Personality', 'artist': 'Living Colour', 'coverUrl': 'https://picsum.photos/seed/6/200', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/cultofpersonality.mp3', 'duration': '4:54'},
     {'id': 't_7', 'title': 'Dale Fuego', 'artist': 'Cartel De Santa, bigman', 'coverUrl': 'https://picsum.photos/seed/7/200', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/dalefuego.mp3', 'duration': '3:05'},

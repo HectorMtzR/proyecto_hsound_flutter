@@ -19,13 +19,16 @@ class HomeScreen extends StatelessWidget {
       ),
       body: GridView.builder(
         padding: const EdgeInsets.all(16),
+        // 1. Agregamos childAspectRatio para hacer la tarjeta más alta y dar espacio al texto
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, crossAxisSpacing: 16, mainAxisSpacing: 16),
+          crossAxisCount: 2, 
+          crossAxisSpacing: 16, 
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.75, // <-- Prueba con 0.75 o 0.7 si necesitas más espacio
+        ),
         itemCount: repo.allTracks.length,
         itemBuilder: (context, index) {
           final track = repo.allTracks[index];
-          
-          // VERIFICAMOS SI ESTA CANCIÓN ES LA QUE ESTÁ SONANDO
           final isPlaying = repo.currentTrack?.id == track.id;
 
           return GestureDetector(
@@ -33,9 +36,10 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
+                // 2. Quitamos Expanded y usamos AspectRatio 1:1 para forzar el cuadrado
+                AspectRatio(
+                  aspectRatio: 1, 
                   child: Container(
-                    // Le ponemos un borde rojo a la imagen si está sonando
                     decoration: BoxDecoration(
                       border: isPlaying ? Border.all(color: Colors.redAccent, width: 3) : null,
                     ),
@@ -45,14 +49,19 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   track.title, 
-                  // Cambiamos el color del texto a rojo si está sonando
                   style: TextStyle(
                     fontWeight: FontWeight.bold, 
                     color: isPlaying ? Colors.redAccent : Colors.white,
                   ), 
-                  maxLines: 1
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis, // Evita errores visuales si el texto es muy largo
                 ),
-                Text(track.artist, style: const TextStyle(color: Colors.white54), maxLines: 1),
+                Text(
+                  track.artist, 
+                  style: const TextStyle(color: Colors.white54), 
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           );
