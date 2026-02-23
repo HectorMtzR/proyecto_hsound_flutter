@@ -24,7 +24,7 @@ class HomeScreen extends StatelessWidget {
           crossAxisCount: 2, 
           crossAxisSpacing: 16, 
           mainAxisSpacing: 16,
-          childAspectRatio: 0.75, // <-- Prueba con 0.75 o 0.7 si necesitas más espacio
+          childAspectRatio: 0.75, // Para ajustar el ratio que ocupa la imagen, se movio para que el cover se vea cuadrado.
         ),
         itemCount: repo.allTracks.length,
         itemBuilder: (context, index) {
@@ -36,7 +36,7 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 2. Quitamos Expanded y usamos AspectRatio 1:1 para forzar el cuadrado
+                // Quitamos Expanded y usamos AspectRatio 1:1 para forzar el cuadrado
                 AspectRatio(
                   aspectRatio: 1, 
                   child: Container(

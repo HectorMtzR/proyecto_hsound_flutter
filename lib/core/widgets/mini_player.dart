@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../mock/mock_repository.dart';
-import '../../features/player/full_player_screen.dart'; // <-- IMPORTANTE IMPORTAR ESTO
+import '../../features/player/full_player_screen.dart'; //
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
@@ -13,7 +13,7 @@ class MiniPlayer extends StatelessWidget {
 
     final track = repo.currentTrack!;
     return GestureDetector(
-      // NUEVO: Abrir reproductor en pantalla completa al tocar
+      // Abrir reproductor en pantalla completa al tocar
       onTap: () {
         showModalBottomSheet(
           context: context,

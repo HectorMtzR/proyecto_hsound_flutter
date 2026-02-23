@@ -8,7 +8,7 @@ class MockRepository extends ChangeNotifier {
   Track? currentTrack;
   bool isPlaying = false;
   
-  // --- NUEVO: Lógica de Reproducción ---
+  // --- Lógica de Reproducción ---
   bool isShuffle = false;
   List<Track> currentQueue = [];
   int currentQueueIndex = -1;
@@ -23,14 +23,13 @@ class MockRepository extends ChangeNotifier {
   Stream<Duration?> get durationStream => _audioPlayer.durationStream;
   Duration get currentDuration => _audioPlayer.duration ?? Duration.zero;
 
-  // Lista de prueba simulada
+  // Lista de prueba simulada conectada a la S3 por medio de CloudFront
   final List<Map<String, dynamic>> _mockDatabaseResponse = [
   {'id': 't_0', 'title': '444', 'artist': 'Yan Block', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/444_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/444.mp3', 'duration': '2:55'},
   {'id': 't_1', 'title': 'Beat It', 'artist': 'Michael Jackson', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/beatit_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/beatit.mp3', 'duration': '4:18'},
   {'id': 't_2', 'title': 'Besos al Aire', 'artist': '3BallMTY, América Sierra, Smoky', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/besosalaire_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/besosalaire.mp3', 'duration': '3:15'},
   {'id': 't_3', 'title': 'Big Ass Bracelet', 'artist': 'Westside Gunn', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/bigassbracelet_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/bigassbracelet.mp3', 'duration': '3:20'},
   {'id': 't_4', 'title': 'C.R.E.A.M.', 'artist': 'Wu-Tang Clan', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/cream_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/cream.mp3', 'duration': '4:12'},
-
   {'id': 't_5', 'title': 'Cuando No Era Cantante', 'artist': 'El Bogueto, Yung Beef', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/cuandonoeracantante_cover.png', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/cuandonoeracantante.mp3', 'duration': '3:45'},
   {'id': 't_6', 'title': 'Cult of Personality', 'artist': 'Living Colour', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/cultofpersonality_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/cultofpersonality.mp3', 'duration': '4:54'},
   {'id': 't_7', 'title': 'Dale Fuego', 'artist': 'Cartel De Santa, bigman', 'coverUrl': 'https://d18au5kb13bfls.cloudfront.net/dalefuego_cover.jpg', 'audioUrl': 'https://d18au5kb13bfls.cloudfront.net/dalefuego.mp3', 'duration': '3:05'},
@@ -74,7 +73,7 @@ class MockRepository extends ChangeNotifier {
     )).toList();
 
     userPlaylists = [
-      // NUEVO: Playlist por defecto
+      // Playlists por defecto. Se habilita "Tus me gusta" y una de muestra.
       Playlist(id: 'p_likes', name: 'Tus me gusta', tracks: []),
       Playlist(id: 'p_1', name: 'Mi Mix', tracks: allTracks.sublist(0, 10)),
     ];
@@ -82,15 +81,13 @@ class MockRepository extends ChangeNotifier {
     // Escuchamos el estado real del reproductor
     _audioPlayer.playerStateStream.listen((state) {
       isPlaying = state.playing;
-      // NUEVO: Si la canción termina, pasar a la siguiente
+      // Si la canción termina, pasar a la siguiente
       if (state.processingState == ProcessingState.completed) {
         playNext();
       }
       notifyListeners();
     });
   }
-
-  // --- NUEVOS MÉTODOS DE REPRODUCCIÓN ---
   
   // Inicia la música con su contexto (toda la biblioteca o una playlist específica)
   Future<void> playTrackContext(Track track, List<Track> contextQueue, {String? playlistId}) async {
@@ -98,8 +95,9 @@ class MockRepository extends ChangeNotifier {
     currentQueueIndex = currentQueue.indexWhere((t) => t.id == track.id);
     currentPlaylistContextId = playlistId;
     
-    // Opcional: Al iniciar una nueva playlist desde cero, borramos la cola manual acumulada
-    upNextQueue.clear(); 
+    // Opcional: Al iniciar una nueva playlist desde cero, borramos la cola manual acumulada.
+    // Por el momento no se ocupa, pero ahi se tiene.
+    // upNextQueue.clear(); 
     
     await _playDirectTrack(track);
   }
@@ -170,7 +168,7 @@ class MockRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- NUEVOS MÉTODOS DE PLAYLISTS Y LIKES ---
+  // --- MÉTODOS DE PLAYLISTS Y LIKES ---
 
   bool isLiked(Track track) {
     return userPlaylists.firstWhere((p) => p.id == 'p_likes').tracks.any((t) => t.id == track.id);
