@@ -31,7 +31,6 @@ class PlaylistDetailScreen extends StatelessWidget {
                 Text(playlist.name, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 
-                // --- BOTÓN DE REPRODUCCIÓN PRINCIPAL ---
                 // --- BOTÓN DE REPRODUCCIÓN ALEATORIA ---
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
