@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart'; // <-- Nuevo import
+import 'firebase_options.dart'; // <-- El archivo generado por FlutterFire
+
 import 'core/theme/app_theme.dart';
 import 'core/mock/mock_repository.dart';
 import 'core/router/app_router.dart';
 
-void main() {
+// Cambiamos el main a "async" para poder esperar a que Firebase cargue
+void main() async {
+  // Aseguramos que los "bindings" de Flutter estén listos antes de llamar a código nativo
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializamos Firebase con las opciones generadas
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => MockRepository(),

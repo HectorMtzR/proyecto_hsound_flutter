@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "912280112700",
+    "project_id": "hsound-4c7c4",
+    "storage_bucket": "hsound-4c7c4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:912280112700:android:03c0be00185a24e74d3d39",
+        "android_client_info": {
+          "package_name": "com.example.proyecto_spotify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApp8rs1LRkyrJaCL9J2jHrSuuVK_H6LZc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
