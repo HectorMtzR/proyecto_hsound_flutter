@@ -99,7 +99,14 @@ class MockRepository extends ChangeNotifier {
 
   // --- NUEVA LÓGICA REAL DE FIREBASE AUTH Y FIRESTORE ---
 
-  // Verifica si el usuario cerró la app pero dejó su sesión abierta
+  // ... (tus otras variables de reproducción) ...
+  
+  // NUEVO: Lista rápida para identificar las canciones favoritas
+  List<String> likedTrackIds = []; 
+
+  // ... (tu constructor) ...
+
+  // REEMPLAZA ESTE MÉTODO:
   void _checkAuthState() {
     _firebaseAuth.authStateChanges().listen((firebaseUser) async {
       if (firebaseUser != null) {
@@ -111,13 +118,31 @@ class MockRepository extends ChangeNotifier {
             displayName: doc.data()?['displayName'] ?? 'Usuario', 
             email: firebaseUser.email!
           );
+
+          // 1. Extraemos su arreglo de la base de datos
+          List<dynamic> dbLikes = doc.data()?['liked_tracks'] ?? [];
+          likedTrackIds = dbLikes.map((e) => e.toString()).toList();
+
+          // 2. Sincronizamos la playlist local "Tus me gusta" con los datos reales
+          _syncLikesPlaylist();
+
           notifyListeners();
         }
       } else {
         currentUser = null;
+        likedTrackIds.clear(); // Limpiamos si cierra sesión
+        _syncLikesPlaylist();
         notifyListeners();
       }
     });
+  }
+
+  // NUEVO: Método privado para reconstruir la playlist local
+  void _syncLikesPlaylist() {
+    final likesPlaylist = userPlaylists.firstWhere((p) => p.id == 'p_likes');
+    likesPlaylist.tracks.clear();
+    // Filtramos todas las canciones para dejar solo las que están en el arreglo de Firestore
+    likesPlaylist.tracks.addAll(allTracks.where((t) => likedTrackIds.contains(t.id)));
   }
 
   // MÉTODO DE REGISTRO REAL
@@ -246,18 +271,43 @@ class MockRepository extends ChangeNotifier {
 
   // --- MÉTODOS DE PLAYLISTS Y LIKES ---
 
+  // --- MÉTODOS DE PLAYLISTS Y LIKES (CONECTADOS A FIRESTORE) ---
+
+  // Ahora es rapidísimo porque solo busca en una lista de Strings
   bool isLiked(Track track) {
-    return userPlaylists.firstWhere((p) => p.id == 'p_likes').tracks.any((t) => t.id == track.id);
+    return likedTrackIds.contains(track.id);
   }
 
-  void toggleLike(Track track) {
-    final likes = userPlaylists.firstWhere((p) => p.id == 'p_likes');
+  Future<void> toggleLike(Track track) async {
+    if (currentUser == null) return; // Evitamos errores si no hay sesión
+
+    final uid = currentUser!.id;
+    final userRef = _firestore.collection('users').doc(uid);
+
     if (isLiked(track)) {
-      likes.tracks.removeWhere((t) => t.id == track.id);
+      // 1. Actualización Optimista (Local)
+      likedTrackIds.remove(track.id);
+      _syncLikesPlaylist();
+      notifyListeners();
+
+      // 2. Actualización en la Nube (Firestore)
+      // FieldValue.arrayRemove quita exactamente ese ID sin importar en qué posición esté
+      await userRef.update({
+        'liked_tracks': FieldValue.arrayRemove([track.id])
+      });
+      
     } else {
-      likes.tracks.add(track);
+      // 1. Actualización Optimista (Local)
+      likedTrackIds.add(track.id);
+      _syncLikesPlaylist();
+      notifyListeners();
+
+      // 2. Actualización en la Nube (Firestore)
+      // FieldValue.arrayUnion agrega el ID asegurándose de que NO existan duplicados
+      await userRef.update({
+        'liked_tracks': FieldValue.arrayUnion([track.id])
+      });
     }
-    notifyListeners();
   }
 
   void addTrackToPlaylist(String playlistId, Track track) {
