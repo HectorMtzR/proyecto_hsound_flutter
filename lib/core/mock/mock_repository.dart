@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth; // <-- Alias para evitar conflictos con tu modelo User
+import 'package:cloud_firestore/cloud_firestore.dart'; // <-- Base de datos
 import '../models/models.dart';
 
 class MockRepository extends ChangeNotifier {
@@ -17,6 +19,10 @@ class MockRepository extends ChangeNotifier {
   List<Track> upNextQueue = []; //Lista para la cola
 
   final AudioPlayer _audioPlayer = AudioPlayer();
+
+  // Instancias reales de Firebase
+  final _firebaseAuth = firebase_auth.FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
 
   // Exponemos los streams para la barra de progreso
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
@@ -87,6 +93,76 @@ class MockRepository extends ChangeNotifier {
       }
       notifyListeners();
     });
+
+    _checkAuthState();
+  }
+
+  // --- NUEVA LÓGICA REAL DE FIREBASE AUTH Y FIRESTORE ---
+
+  // Verifica si el usuario cerró la app pero dejó su sesión abierta
+  void _checkAuthState() {
+    _firebaseAuth.authStateChanges().listen((firebaseUser) async {
+      if (firebaseUser != null) {
+        // Traemos sus datos desde Firestore
+        final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+        if (doc.exists) {
+          currentUser = User(
+            id: firebaseUser.uid, 
+            displayName: doc.data()?['displayName'] ?? 'Usuario', 
+            email: firebaseUser.email!
+          );
+          notifyListeners();
+        }
+      } else {
+        currentUser = null;
+        notifyListeners();
+      }
+    });
+  }
+
+  // MÉTODO DE REGISTRO REAL
+  Future<void> register(String email, String password, String displayName) async {
+    try {
+      // 1. Crear el usuario en Firebase Auth
+      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email, 
+        password: password
+      );
+
+      final uid = userCredential.user!.uid;
+
+      // 2. Crear su documento de perfil en Cloud Firestore (La estructura que diseñamos)
+      await _firestore.collection('users').doc(uid).set({
+        'email': email,
+        'displayName': displayName,
+        'liked_tracks': [], // Arreglo vacío por defecto
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // El listener _checkAuthState detectará el cambio y actualizará currentUser automáticamente
+
+    } catch (e) {
+      debugPrint("Error al registrar: $e");
+      rethrow; // Lanzamos el error para mostrarlo en la UI
+    }
+  }
+
+  // MÉTODO DE LOGIN REAL
+  Future<void> login(String email, String password) async {
+    try {
+      await _firebaseAuth.signInWithEmailAndPassword(email: email, password: password);
+    } catch (e) {
+      debugPrint("Error al iniciar sesión: $e");
+      rethrow;
+    }
+  }
+
+  // MÉTODO DE LOGOUT REAL
+  Future<void> logout() async {
+    await _firebaseAuth.signOut();
+    currentTrack = null;
+    _audioPlayer.stop();
+    notifyListeners(); // Esto forzará al Router a mandarnos a la pantalla de Login
   }
   
   // Inicia la música con su contexto (toda la biblioteca o una playlist específica)
@@ -201,18 +277,6 @@ class MockRepository extends ChangeNotifier {
 
   void createPlaylist(String name) {
     userPlaylists.add(Playlist(id: 'p_${DateTime.now().millisecondsSinceEpoch}', name: name, tracks: []));
-    notifyListeners();
-  }
-
-  void login(String email, String password) {
-    currentUser = User(id: 'u_1', displayName: 'Hector', email: email);
-    notifyListeners();
-  }
-
-  void logout() {
-    currentUser = null;
-    currentTrack = null;
-    _audioPlayer.stop();
     notifyListeners();
   }
 
