@@ -26,8 +26,36 @@ class PlaylistDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Column(
               children: [
-                Container(width: 150, height: 150, color: Colors.grey[800], child: const Icon(Icons.album, size: 80, color: Colors.white24)),
-                const SizedBox(height: 16),
+                // --- AQUÍ ESTÁ EL CAMBIO: CONTENEDOR DE LA PORTADA INTELIGENTE ---
+                Center(
+                  child: Container(
+                    width: 200, // Tamaño grande para el encabezado
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5), 
+                          blurRadius: 15, 
+                          offset: const Offset(0, 8)
+                        )
+                      ],
+                      image: playlist.coverUrl.isNotEmpty
+                          ? DecorationImage(
+                              image: NetworkImage(playlist.coverUrl),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: playlist.coverUrl.isEmpty
+                        ? const Icon(Icons.music_note, color: Colors.white54, size: 80)
+                        : null,
+                  ),
+                ),
+                // --- FIN DEL CONTENEDOR DE PORTADA ---
+                
+                const SizedBox(height: 24),
                 Text(playlist.name, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 
@@ -65,7 +93,15 @@ class PlaylistDetailScreen extends StatelessWidget {
                 final isPlaying = repo.currentTrack?.id == track.id;
                 
                 return ListTile(
-                  leading: Image.network(track.coverUrl, width: 48, height: 48, fit: BoxFit.cover),
+                  // Y DE PASO, APLICAMOS LA MISMA LÓGICA A LAS CANCIONES PARA PREVENIR ERRORES
+                  leading: Container(
+                    width: 48,
+                    height: 48,
+                    color: Colors.grey[800],
+                    child: track.coverUrl.isNotEmpty 
+                        ? Image.network(track.coverUrl, fit: BoxFit.cover)
+                        : const Icon(Icons.music_note, color: Colors.white54),
+                  ),
                   title: Text(track.title, style: TextStyle(color: isPlaying ? Colors.redAccent : Colors.white)),
                   subtitle: Text(track.artist),
                   // --- CAMBIAMOS EL ÍCONO ESTÁTICO POR UN BOTÓN FUNCIONAL ---

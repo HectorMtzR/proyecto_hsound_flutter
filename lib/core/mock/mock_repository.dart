@@ -1,9 +1,15 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import '../models/models.dart';
+import 'dart:io'; // Para manejar el archivo de la foto
+import 'package:minio/minio.dart';
+import 'package:uuid/uuid.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:typed_data';
 
 class MockRepository extends ChangeNotifier {
   User? currentUser;
@@ -268,9 +274,79 @@ class MockRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  void createPlaylist(String name) {
-    userPlaylists.add(Playlist(id: 'p_${DateTime.now().millisecondsSinceEpoch}', name: name, tracks: []));
-    notifyListeners();
+  // --- NUEVA CREACIÓN DE PLAYLISTS CON CÁMARA (AWS S3) Y FIRESTORE ---
+  Future<void> createPlaylistWithImage(String name, File? imageFile) async {
+    if (currentUser == null) return;
+    
+    String finalCoverUrl = ''; 
+    final playlistId = const Uuid().v4(); // Generamos un ID único
+
+    try {
+      // 1. SUBIDA A AWS S3
+      if (imageFile != null) {
+        // Inicializamos el cliente S3
+        // Inicializamos el cliente S3 de forma segura
+        final minio = Minio(
+          endPoint: 's3.amazonaws.com', 
+          region: dotenv.env['AWS_REGION'] ?? 'us-east-1', 
+          accessKey: dotenv.env['AWS_ACCESS_KEY'] ?? '', 
+          secretKey: dotenv.env['AWS_SECRET_KEY'] ?? '', 
+        );
+
+        final bucketName = dotenv.env['AWS_BUCKET_NAME'] ?? '';
+        
+        // Extraemos la extensión de la foto (.jpg, .png) y le damos un nombre único
+        final extension = imageFile.path.split('.').last;
+        final fileName = 'covers/${DateTime.now().millisecondsSinceEpoch}.$extension';
+
+        // 1. Leemos el archivo físico y lo convertimos a bytes (Uint8List)
+        final bytes = await imageFile.readAsBytes();
+        
+        // 2. Lo envolvemos en un Stream (que es lo que pide MinIO en Dart)
+        final stream = Stream.value(bytes);
+
+        // 3. Subimos el objeto a AWS S3 con 'putObject'
+        await minio.putObject(
+          bucketName, 
+          fileName, 
+          stream,
+          size: bytes.length,
+          // Opcional: Le decimos a S3 que es una imagen para que el navegador sepa cómo tratarla
+          metadata: {'Content-Type': 'image/$extension'}, 
+        );
+        
+        // 2. CONSTRUIMOS LA URL PÚBLICA USANDO TU CDN (CLOUDFRONT)
+        final cloudFrontDomain = dotenv.env['AWS_CLOUDFRONT_DOMAIN'] ?? 'd18au5kb13bfls.cloudfront.net';
+        
+        // El fileName ya incluye la carpeta 'covers/', así que la URL queda perfecta:
+        finalCoverUrl = 'https://$cloudFrontDomain/$fileName';
+      }
+
+      // 3. GUARDAMOS EN FIRESTORE
+      final newPlaylistRef = _firestore.collection('playlists').doc(playlistId);
+      
+      await newPlaylistRef.set({
+        'name': name,
+        'ownerId': currentUser!.id,
+        'coverUrl': finalCoverUrl,
+        'trackIds': [], 
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // 4. ACTUALIZACIÓN OPTIMISTA EN LA UI
+      userPlaylists.add(Playlist(
+        id: playlistId, 
+        name: name, 
+        tracks: [],
+        coverUrl: finalCoverUrl
+      ));
+      
+      notifyListeners();
+
+    } catch (e) {
+      debugPrint("Error al crear la playlist: $e");
+      rethrow;
+    }
   }
 
   @override
