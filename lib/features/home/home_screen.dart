@@ -71,18 +71,6 @@ class HomeScreen extends StatelessWidget {
         },
       ),
 
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.redAccent,
-        onPressed: () {
-          // Disparamos el script
-          repo.migrateDatabase();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Migrando... Revisa la terminal')),
-          );
-        },
-        child: const Icon(Icons.cloud_upload, color: Colors.white),
-      ),
-
     );
   }
 }
