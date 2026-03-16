@@ -10,6 +10,7 @@ import 'package:minio/minio.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:typed_data';
+import 'package:just_audio_background/just_audio_background.dart';
 
 class MockRepository extends ChangeNotifier {
   User? currentUser;
@@ -237,7 +238,20 @@ class MockRepository extends ChangeNotifier {
     currentTrack = track;
     notifyListeners(); 
     try {
-      await _audioPlayer.setUrl(track.audioUrl);
+      // 1. Creamos la fuente de audio con su etiqueta (metadata) para Android/iOS
+      final audioSource = AudioSource.uri(
+        Uri.parse(track.audioUrl), // Usamos tu propiedad audioUrl
+        tag: MediaItem(
+          id: track.id,
+          title: track.title,
+          artist: track.artist,
+          // Le pasamos la URL de tu CloudFront para que muestre la portada
+          artUri: track.coverUrl.isNotEmpty ? Uri.parse(track.coverUrl) : null,
+        ),
+      );
+
+      // 2. En lugar de setUrl, usamos setAudioSource
+      await _audioPlayer.setAudioSource(audioSource);
       _audioPlayer.play();
     } catch (e) {
       debugPrint("Error al reproducir audio: $e");

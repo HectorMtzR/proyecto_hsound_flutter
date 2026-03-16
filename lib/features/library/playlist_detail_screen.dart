@@ -168,15 +168,33 @@ class PlaylistDetailScreen extends StatelessWidget {
   }
 
   // --- DIÁLOGO PARA SELECCIONAR A QUÉ PLAYLIST AGREGAR ---
+  // --- DIÁLOGO PARA SELECCIONAR A QUÉ PLAYLIST AGREGAR ---
   void _showPlaylistSelector(BuildContext context, MockRepository repo, Track track) {
+    // 1. Filtramos para excluir las listas del sistema ('p_likes' y 'p_1')
+    final userCreatedPlaylists = repo.userPlaylists.where(
+      (p) => p.id != 'p_likes' && p.id != 'p_1'
+    ).toList();
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[850],
       builder: (ctx) {
         return ListView(
           children: [
-            const Padding(padding: EdgeInsets.all(16.0), child: Text('Selecciona una playlist', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-            ...repo.userPlaylists.map((playlist) => ListTile(
+            const Padding(
+              padding: EdgeInsets.all(16.0), 
+              child: Text('Selecciona una playlist', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))
+            ),
+            
+            // 2. Si no ha creado ninguna playlist, le avisamos
+            if (userCreatedPlaylists.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('No has creado ninguna playlist personal aún.', style: TextStyle(color: Colors.white54)),
+              ),
+
+            // 3. Mostramos únicamente las listas válidas
+            ...userCreatedPlaylists.map((playlist) => ListTile(
               title: Text(playlist.name),
               onTap: () {
                 repo.addTrackToPlaylist(playlist.id, track);
