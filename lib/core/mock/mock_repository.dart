@@ -94,6 +94,59 @@ class MockRepository extends ChangeNotifier {
     }
   }
 
+  // --- MÉTODO PARA DESCARGAR LAS PLAYLISTS DEL USUARIO ---
+  Future<void> fetchUserPlaylists() async {
+    if (currentUser == null) return;
+
+    try {
+      // 1. Hacemos la consulta filtrando por el ID del usuario (Relación)
+      final snapshot = await _firestore
+          .collection('playlists')
+          .where('ownerId', isEqualTo: currentUser!.id)
+          .get();
+
+      // 2. Rescatamos las playlists por defecto ("Tus me gusta" y "Mi Mix")
+      final likesPlaylist = userPlaylists.firstWhere((p) => p.id == 'p_likes');
+      final miMix = userPlaylists.firstWhere((p) => p.id == 'p_1');
+
+      // 3. Limpiamos la lista para evitar duplicados en Hot Reloads
+      userPlaylists.clear();
+      userPlaylists.add(likesPlaylist);
+      userPlaylists.add(miMix);
+
+      // 4. Convertimos los documentos de Firebase en objetos Playlist de Flutter
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        
+        // Extraemos los IDs de las canciones guardadas en esta playlist
+        List<dynamic> dbTrackIds = data['trackIds'] ?? [];
+        List<Track> playlistTracks = [];
+
+        // Buscamos cada ID en nuestro catálogo global y lo agregamos a la lista
+        for (var trackId in dbTrackIds) {
+          try {
+            // Usamos firstWhere para encontrar la canción real en allTracks
+            final track = allTracks.firstWhere((t) => t.id == trackId.toString());
+            playlistTracks.add(track);
+          } catch (e) {
+            // Si la canción ya no existe en el catálogo, la ignoramos silenciosamente
+          }
+        }
+
+        userPlaylists.add(Playlist(
+          id: doc.id,
+          name: data['name'] ?? 'Playlist',
+          coverUrl: data['coverUrl'] ?? '',
+          tracks: playlistTracks, // ¡Ahora inyectamos las canciones reales aquí!
+        ));
+      }
+
+      notifyListeners(); // Avisamos a la UI que ya llegaron las listas
+    } catch (e) {
+      debugPrint("Error al cargar playlists: $e");
+    }
+  }
+
   // --- LÓGICA DE SESIÓN Y SINCRONIZACIÓN ---
   void _checkAuthState() {
     _firebaseAuth.authStateChanges().listen((firebaseUser) async {
@@ -112,7 +165,10 @@ class MockRepository extends ChangeNotifier {
           // 1. DESCARGAMOS EL CATÁLOGO DE CANCIONES
           await fetchTracksFromFirebase();
 
-          // 2. SINCRONIZAMOS LOS LIKES (Ahora sí encontrará las canciones)
+          // 2. DESCARGAMOS LAS PLAYLISTS DEL USUARIO (NUEVO)
+          await fetchUserPlaylists();
+
+          // 3. SINCRONIZAMOS LOS LIKES (Ahora sí encontrará las canciones)
           _syncLikesPlaylist();
 
           notifyListeners();
@@ -260,18 +316,41 @@ class MockRepository extends ChangeNotifier {
     }
   }
 
-  void addTrackToPlaylist(String playlistId, Track track) {
+  Future<void> addTrackToPlaylist(String playlistId, Track track) async {
     final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
+    
+    // Evitar duplicados localmente
     if (!playlist.tracks.any((t) => t.id == track.id)) {
+      // 1. Actualización Optimista (UI)
       playlist.tracks.add(track);
       notifyListeners();
+
+      // 2. Actualización en Firestore
+      try {
+        await _firestore.collection('playlists').doc(playlistId).update({
+          'trackIds': FieldValue.arrayUnion([track.id])
+        });
+      } catch (e) {
+        debugPrint("Error al agregar canción a Firestore: $e");
+      }
     }
   }
 
-  void removeTrackFromPlaylist(String playlistId, Track track) {
+  Future<void> removeTrackFromPlaylist(String playlistId, Track track) async {
     final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
+    
+    // 1. Actualización Optimista (UI)
     playlist.tracks.removeWhere((t) => t.id == track.id);
     notifyListeners();
+
+    // 2. Actualización en Firestore
+    try {
+      await _firestore.collection('playlists').doc(playlistId).update({
+        'trackIds': FieldValue.arrayRemove([track.id])
+      });
+    } catch (e) {
+      debugPrint("Error al eliminar canción de Firestore: $e");
+    }
   }
 
   // --- NUEVA CREACIÓN DE PLAYLISTS CON CÁMARA (AWS S3) Y FIRESTORE ---
@@ -345,6 +424,27 @@ class MockRepository extends ChangeNotifier {
 
     } catch (e) {
       debugPrint("Error al crear la playlist: $e");
+      rethrow;
+    }
+  }
+
+  // --- MÉTODO PARA ELIMINAR PLAYLIST ---
+  Future<void> deletePlaylist(String playlistId) async {
+    // 1. Candado de seguridad: No borrar las listas del sistema
+    if (playlistId == 'p_likes' || playlistId == 'p_1') return;
+
+    try {
+      // 2. Eliminamos el documento de Firestore
+      await _firestore.collection('playlists').doc(playlistId).delete();
+
+      // 3. Actualizamos la UI localmente
+      userPlaylists.removeWhere((p) => p.id == playlistId);
+      notifyListeners();
+
+      // Nota técnica: Idealmente aquí también nos conectaríamos a S3 
+      // para borrar la foto, pero por tiempo, dejaremos que se quede huérfana en el bucket.
+    } catch (e) {
+      debugPrint("Error al eliminar la playlist: $e");
       rethrow;
     }
   }

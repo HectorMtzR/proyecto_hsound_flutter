@@ -50,6 +50,48 @@ class LibraryScreen extends StatelessWidget {
             title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('Playlist • ${repo.currentUser?.displayName ?? 'Usuario'}'),
             onTap: () => context.go('/library/playlist/${playlist.id}'),
+            
+            // --- NUEVA FUNCIONALIDAD: DEJAR PRESIONADO ---
+            onLongPress: () {
+              // Evitamos que intenten borrar las listas por defecto
+              if (playlist.id == 'p_likes' || playlist.id == 'p_1') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('No puedes eliminar una playlist del sistema.'))
+                );
+                return;
+              }
+
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: Colors.grey[900],
+                  title: const Text('Eliminar Playlist', style: TextStyle(color: Colors.white)),
+                  content: Text('¿Estás seguro de que deseas eliminar "${playlist.name}"? Esta acción no se puede deshacer.', style: const TextStyle(color: Colors.white70)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx); // Cerramos el diálogo primero
+                        try {
+                          await repo.deletePlaylist(playlist.id);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Playlist eliminada')));
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al eliminar')));
+                          }
+                        }
+                      },
+                      child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+            },
           );
         },
       ),
