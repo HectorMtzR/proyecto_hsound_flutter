@@ -19,12 +19,11 @@ class HomeScreen extends StatelessWidget {
       ),
       body: GridView.builder(
         padding: const EdgeInsets.all(16),
-        // 1. Agregamos childAspectRatio para hacer la tarjeta más alta y dar espacio al texto
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2, 
           crossAxisSpacing: 16, 
           mainAxisSpacing: 16,
-          childAspectRatio: 0.75, // Para ajustar el ratio que ocupa la imagen, se movio para que el cover se vea cuadrado.
+          childAspectRatio: 0.75, 
         ),
         itemCount: repo.allTracks.length,
         itemBuilder: (context, index) {
@@ -36,15 +35,19 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Quitamos Expanded y usamos AspectRatio 1:1 para forzar el cuadrado
                 AspectRatio(
                   aspectRatio: 1, 
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: isPlaying ? Border.all(color: Colors.redAccent, width: 3) : null,
+                  // --- AQUÍ ENVOLVEMOS TU CONTENEDOR DE LA IMAGEN CON EL HERO ---
+                  child: Hero(
+                    tag: 'track_cover_${track.id}', // La etiqueta única
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: isPlaying ? Border.all(color: Colors.redAccent, width: 3) : null,
+                      ),
+                      child: Image.network(track.coverUrl, fit: BoxFit.cover, width: double.infinity),
                     ),
-                    child: Image.network(track.coverUrl, fit: BoxFit.cover, width: double.infinity),
                   ),
+                  // -----------------------------------------------------------------
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -54,7 +57,7 @@ class HomeScreen extends StatelessWidget {
                     color: isPlaying ? Colors.redAccent : Colors.white,
                   ), 
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis, // Evita errores visuales si el texto es muy largo
+                  overflow: TextOverflow.ellipsis, 
                 ),
                 Text(
                   track.artist, 

@@ -42,18 +42,25 @@ class MockRepository extends ChangeNotifier {
   bool isLoadingTracks = false; // Indicador de carga para la UI
 
   MockRepository() {
-    // Inicializamos las playlists base (vacías por ahora)
+    // Inicializamos las playlists base
     userPlaylists = [
       Playlist(id: 'p_likes', name: 'Tus me gusta', tracks: []),
       Playlist(id: 'p_1', name: 'Mi Mix', tracks: []), 
     ];
 
+    // 1. Escuchamos si le ponen pausa o play
     _audioPlayer.playerStateStream.listen((state) {
       isPlaying = state.playing;
-      if (state.processingState == ProcessingState.completed) {
-        playNext();
-      }
       notifyListeners();
+    });
+
+    // 2. ¡NUEVO! Escuchamos cuando Android cambia de canción (desde la app o pantalla de bloqueo)
+    _audioPlayer.currentIndexStream.listen((index) {
+      if (index != null && currentQueue.isNotEmpty && index < currentQueue.length) {
+        currentQueueIndex = index;
+        currentTrack = currentQueue[index];
+        notifyListeners();
+      }
     });
 
     _checkAuthState();
@@ -226,35 +233,43 @@ class MockRepository extends ChangeNotifier {
     notifyListeners(); 
   }
   
-  // --- MÉTODOS DE REPRODUCCIÓN ---
+
+  // --- MÉTODOS DE REPRODUCCIÓN 2.0 (Nativo y Background) ---
+  
   Future<void> playTrackContext(Track track, List<Track> contextQueue, {String? playlistId}) async {
     currentQueue = List.from(contextQueue);
     currentQueueIndex = currentQueue.indexWhere((t) => t.id == track.id);
     currentPlaylistContextId = playlistId;
-    await _playDirectTrack(track);
-  }
 
-  Future<void> _playDirectTrack(Track track) async {
+    // Actualizamos la UI inmediatamente para que no se sienta lag
     currentTrack = track;
     notifyListeners(); 
-    try {
-      // 1. Creamos la fuente de audio con su etiqueta (metadata) para Android/iOS
-      final audioSource = AudioSource.uri(
-        Uri.parse(track.audioUrl), // Usamos tu propiedad audioUrl
-        tag: MediaItem(
-          id: track.id,
-          title: track.title,
-          artist: track.artist,
-          // Le pasamos la URL de tu CloudFront para que muestre la portada
-          artUri: track.coverUrl.isNotEmpty ? Uri.parse(track.coverUrl) : null,
-        ),
-      );
 
-      // 2. En lugar de setUrl, usamos setAudioSource
-      await _audioPlayer.setAudioSource(audioSource);
+    try {
+      // 1. Convertimos toda tu lista en AudioSources con sus etiquetas de imagen para Android
+      final audioSources = currentQueue.map((t) => AudioSource.uri(
+        Uri.parse(t.audioUrl),
+        tag: MediaItem(
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          artUri: t.coverUrl.isNotEmpty ? Uri.parse(t.coverUrl) : null,
+        ),
+      )).toList();
+
+      // 2. Empaquetamos todo en una Playlist oficial de just_audio
+      final playlist = ConcatenatingAudioSource(children: audioSources);
+
+      // 3. Cargamos la playlist completa y le decimos en qué número arrancar
+      await _audioPlayer.setAudioSource(
+        playlist,
+        initialIndex: currentQueueIndex, 
+        initialPosition: Duration.zero,
+      );
+      
       _audioPlayer.play();
     } catch (e) {
-      debugPrint("Error al reproducir audio: $e");
+      debugPrint("Error al reproducir audio en contexto: $e");
     }
   }
 
@@ -262,34 +277,26 @@ class MockRepository extends ChangeNotifier {
     _audioPlayer.playing ? _audioPlayer.pause() : _audioPlayer.play();
   }
 
+  // Ahora delegamos los controles a la máquina interna de just_audio
   void playNext() {
-    if (upNextQueue.isNotEmpty) {
-      final nextManualTrack = upNextQueue.removeAt(0);
-      _playDirectTrack(nextManualTrack);
-      return; 
+    if (_audioPlayer.hasNext) {
+      _audioPlayer.seekToNext();
     }
-    if (currentQueue.isEmpty) return;
-
-    if (isShuffle) {
-      currentQueueIndex = Random().nextInt(currentQueue.length);
-    } else {
-      currentQueueIndex = (currentQueueIndex + 1) % currentQueue.length;
-    }
-    _playDirectTrack(currentQueue[currentQueueIndex]);
   }
 
   void playPrevious() {
-    if (currentQueue.isEmpty) return;
-    if (isShuffle) {
-      currentQueueIndex = Random().nextInt(currentQueue.length);
-    } else {
-      currentQueueIndex = (currentQueueIndex - 1) < 0 ? currentQueue.length - 1 : currentQueueIndex - 1;
+    if (_audioPlayer.hasPrevious) {
+      _audioPlayer.seekToPrevious();
     }
-    _playDirectTrack(currentQueue[currentQueueIndex]);
   }
 
-  void toggleShuffle() {
+  // just_audio también maneja el aleatorio de manera nativa y robusta
+  Future<void> toggleShuffle() async {
     isShuffle = !isShuffle;
+    await _audioPlayer.setShuffleModeEnabled(isShuffle);
+    if (isShuffle) {
+      await _audioPlayer.shuffle();
+    }
     notifyListeners();
   }
 
@@ -297,9 +304,21 @@ class MockRepository extends ChangeNotifier {
     _audioPlayer.seek(position);
   }
 
-  void addToQueueNext(Track track) {
-    upNextQueue.add(track); 
-    notifyListeners();
+  // Agrega canciones dinámicamente sin interrumpir la música actual
+  void addToQueueNext(Track track) async {
+    if (_audioPlayer.audioSource is ConcatenatingAudioSource) {
+      final playlist = _audioPlayer.audioSource as ConcatenatingAudioSource;
+      final nextIndex = (_audioPlayer.currentIndex ?? 0) + 1;
+      
+      final newSource = AudioSource.uri(
+        Uri.parse(track.audioUrl),
+        tag: MediaItem(id: track.id, title: track.title, artist: track.artist, artUri: track.coverUrl.isNotEmpty ? Uri.parse(track.coverUrl) : null),
+      );
+      
+      await playlist.insert(nextIndex, newSource);
+      currentQueue.insert(nextIndex, track); // Actualizamos la lista local
+      notifyListeners();
+    }
   }
 
   // --- MÉTODOS DE LIKES Y PLAYLISTS ---

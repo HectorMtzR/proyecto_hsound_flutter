@@ -8,6 +8,7 @@ import '../../features/library/playlist_detail_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/settings/info_screen.dart';
 import '../mock/mock_repository.dart';
+import '../../features/search/search_screen.dart';
 
 GoRouter createRouter(MockRepository repo) {
   return GoRouter(
@@ -26,6 +27,9 @@ GoRouter createRouter(MockRepository repo) {
         builder: (context, state, child) => MainLayout(child: child),
         routes: [
           GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+
+          GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),
+
           GoRoute(
             path: '/library',
             builder: (context, state) => const LibraryScreen(),

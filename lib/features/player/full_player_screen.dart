@@ -1,10 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:palette_generator/palette_generator.dart'; // <-- IMPORTANTE: El paquete de colores
 import '../../core/mock/mock_repository.dart';
 import '../../core/models/models.dart';
 
-class FullPlayerScreen extends StatelessWidget {
+// 1. Lo convertimos a StatefulWidget para poder cambiar el color de fondo
+class FullPlayerScreen extends StatefulWidget {
   const FullPlayerScreen({super.key});
+
+  @override
+  State<FullPlayerScreen> createState() => _FullPlayerScreenState();
+}
+
+class _FullPlayerScreenState extends State<FullPlayerScreen> {
+  // Guardamos tu rojo tipo Canva como color por defecto por si la imagen tarda
+  Color _backgroundColor = const Color(0xFFC62828); 
+
+  @override
+  void initState() {
+    super.initState();
+    _updatePalette(); // Calculamos el color al abrir la pantalla
+  }
+
+  @override
+  void didUpdateWidget(covariant FullPlayerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updatePalette(); // Recalculamos si cambia la canción mientras la pantalla está abierta
+  }
+
+  // 2. FUNCIÓN PARA EXTRAER EL COLOR DE LA PORTADA
+  Future<void> _updatePalette() async {
+    final repo = context.read<MockRepository>();
+    final track = repo.currentTrack;
+
+    if (track == null || track.coverUrl.isEmpty) return;
+
+    try {
+      final palette = await PaletteGenerator.fromImageProvider(
+        NetworkImage(track.coverUrl),
+        maximumColorCount: 10,
+      );
+      if (mounted) {
+        setState(() {
+          // Buscamos un color oscuro y vibrante, si no hay, usamos el dominante
+          _backgroundColor = palette.darkVibrantColor?.color ?? 
+                             palette.dominantColor?.color ?? 
+                             const Color(0xFFC62828);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error extrayendo color: $e");
+    }
+  }
 
   String _formatDuration(Duration d) {
     final minutes = d.inMinutes;
@@ -20,7 +67,8 @@ class FullPlayerScreen extends StatelessWidget {
     if (track == null) return const SizedBox.shrink();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFC62828), // Fondo Rojo tipo Canva
+      // 3. APLICAMOS EL COLOR DINÁMICO AL FONDO
+      backgroundColor: _backgroundColor, 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -42,10 +90,25 @@ class FullPlayerScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Carátula cuadrada grande
-            AspectRatio(
-              aspectRatio: 1,
-              child: Image.network(track.coverUrl, fit: BoxFit.cover),
+            // 4. ¡AQUÍ ESTÁ EL HERO ENVOLVIENDO TU CARÁTULA!
+            Hero(
+              tag: 'track_cover_${track.id}', // La misma etiqueta que pusiste en home_screen
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  // Le agregamos una sombra sutil para que resalte más sobre el fondo dinámico
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      )
+                    ]
+                  ),
+                  child: Image.network(track.coverUrl, fit: BoxFit.cover),
+                ),
+              ),
             ),
             const SizedBox(height: 32),
             
