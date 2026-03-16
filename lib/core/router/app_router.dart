@@ -5,6 +5,7 @@ import '../../features/home/home_screen.dart';
 import '../../features/library/library_screen.dart';
 import '../../features/library/create_playlist_screen.dart';
 import '../../features/library/playlist_detail_screen.dart';
+import '../../features/library/album_detail_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/settings/info_screen.dart';
 import '../mock/mock_repository.dart';
@@ -43,6 +44,14 @@ GoRouter createRouter(MockRepository repo) {
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
                   return PlaylistDetailScreen(playlistId: id);
+                },
+              ),
+              // Dentro de ShellRoute -> /library -> routes: [ ... ]
+              GoRoute(
+                path: 'album/:name',
+                builder: (context, state) {
+                  final name = state.pathParameters['name']!;
+                  return AlbumDetailScreen(albumName: name);
                 },
               ),
             ],

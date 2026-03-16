@@ -66,6 +66,26 @@ class MockRepository extends ChangeNotifier {
     _checkAuthState();
   }
 
+  // --- LÓGICA DE AGRUPACIÓN POR ÁLBUMES (EN MEMORIA) ---
+  
+  // Usamos un "getter" para que se calcule automáticamente cada vez que se pida,
+  // asegurando que siempre tenga la información más fresca de allTracks.
+  Map<String, List<Track>> get groupedByAlbum {
+    final Map<String, List<Track>> albumMap = {};
+
+    for (var track in allTracks) {
+      // Si la caja de este álbum aún no existe en el diccionario, la creamos vacía
+      if (!albumMap.containsKey(track.album)) {
+        albumMap[track.album] = [];
+      }
+      // Metemos la canción a su caja correspondiente
+      albumMap[track.album]!.add(track);
+    }
+
+    return albumMap;
+  }
+
+
   // --- MÉTODO PARA DESCARGAR CANCIONES DESDE FIRESTORE ---
   Future<void> fetchTracksFromFirebase() async {
     isLoadingTracks = true;
