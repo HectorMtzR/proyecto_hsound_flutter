@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/mock/mock_repository.dart';
-import '../../core/models/models.dart';
 
 class AlbumDetailScreen extends StatelessWidget {
   final String albumName;

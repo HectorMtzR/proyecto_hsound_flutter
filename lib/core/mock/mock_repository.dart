@@ -1,5 +1,4 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth; 
@@ -8,8 +7,6 @@ import '../models/models.dart';
 import 'dart:io'; // Para manejar el archivo de la foto
 import 'package:minio/minio.dart';
 import 'package:uuid/uuid.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:typed_data';
 import 'package:just_audio_background/just_audio_background.dart';
 
 class MockRepository extends ChangeNotifier {
