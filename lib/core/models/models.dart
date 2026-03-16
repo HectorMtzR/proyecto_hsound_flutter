@@ -10,11 +10,12 @@ class Track {
   final String id;
   final String title;
   final String artist;
+  final String album;
   final String coverUrl;
   final String audioUrl;
   final String duration;
 
-  Track({required this.id, required this.title, required this.artist, required this.coverUrl, required this.audioUrl, required this.duration});
+  Track({required this.id, required this.title, required this.artist, required this.album, required this.coverUrl, required this.audioUrl, required this.duration});
 }
 
 class Playlist {
