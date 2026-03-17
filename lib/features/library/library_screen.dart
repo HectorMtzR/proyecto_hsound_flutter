@@ -63,6 +63,45 @@ class LibraryScreen extends StatelessWidget {
                   title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                   subtitle: Text('${playlist.tracks.length} canciones', style: const TextStyle(color: Colors.white54)),
                   onTap: () => context.push('/library/playlist/${playlist.id}'),
+
+                  onLongPress: () {
+
+                    if (playlist.name == 'Tus me gusta' || playlist.name == 'Mi Mix') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No puedes eliminar las playlists del sistema'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                      return; // Cortamos la ejecución aquí, el diálogo nunca se abrirá
+                    }
+
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: Colors.grey[900],
+                        title: const Text('Eliminar Playlist', style: TextStyle(color: Colors.white)),
+                        content: Text('¿Seguro que quieres eliminar "${playlist.name}"?', style: const TextStyle(color: Colors.white70)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              // Ejecutamos la función de tu repositorio para borrar
+                              repo.deletePlaylist(playlist.id); 
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Playlist eliminada')),
+                              );
+                            },
+                            child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),

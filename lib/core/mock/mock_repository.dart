@@ -412,44 +412,39 @@ class MockRepository extends ChangeNotifier {
     final playlistId = const Uuid().v4(); // Generamos un ID único
 
     try {
-      // 1. SUBIDA A AWS S3
+      // 1. SUBIDA A ORACLE CLOUD (OCI COMPATIBLE CON S3)
       if (imageFile != null) {
-        // Inicializamos el cliente S3
-        // Inicializamos el cliente S3 de forma segura
+        final region = dotenv.env['OCI_REGION'] ?? '';
+        final namespace = dotenv.env['OCI_NAMESPACE'] ?? '';
+        final bucketName = dotenv.env['OCI_BUCKET_NAME'] ?? '';
+        
+        // El endpoint mágico que convierte a Oracle en un clon de S3
+        final ociEndpoint = '$namespace.compat.objectstorage.$region.oraclecloud.com';
+
         final minio = Minio(
-          endPoint: 's3.amazonaws.com', 
-          region: dotenv.env['AWS_REGION'] ?? 'us-east-1', 
-          accessKey: dotenv.env['AWS_ACCESS_KEY'] ?? '', 
-          secretKey: dotenv.env['AWS_SECRET_KEY'] ?? '', 
+          endPoint: ociEndpoint,
+          accessKey: dotenv.env['OCI_ACCESS_KEY'] ?? '',
+          secretKey: dotenv.env['OCI_SECRET_KEY'] ?? '',
+          useSSL: true, // OCI exige conexión segura
         );
 
-        final bucketName = dotenv.env['AWS_BUCKET_NAME'] ?? '';
-        
-        // Extraemos la extensión de la foto (.jpg, .png) y le damos un nombre único
         final extension = imageFile.path.split('.').last;
         final fileName = 'covers/${DateTime.now().millisecondsSinceEpoch}.$extension';
-
-        // 1. Leemos el archivo físico y lo convertimos a bytes (Uint8List)
         final bytes = await imageFile.readAsBytes();
-        
-        // 2. Lo envolvemos en un Stream (que es lo que pide MinIO en Dart)
         final stream = Stream.value(bytes);
 
-        // 3. Subimos el objeto a AWS S3 con 'putObject'
+        // Subimos el objeto
         await minio.putObject(
           bucketName, 
           fileName, 
           stream,
           size: bytes.length,
-          // Opcional: Le decimos a S3 que es una imagen para que el navegador sepa cómo tratarla
           metadata: {'Content-Type': 'image/$extension'}, 
         );
         
-        // 2. CONSTRUIMOS LA URL PÚBLICA USANDO TU CDN (CLOUDFRONT)
-        final cloudFrontDomain = dotenv.env['AWS_CLOUDFRONT_DOMAIN'] ?? 'd18au5kb13bfls.cloudfront.net';
-        
-        // El fileName ya incluye la carpeta 'covers/', así que la URL queda perfecta:
-        finalCoverUrl = 'https://$cloudFrontDomain/$fileName';
+        // 2. CONSTRUIMOS LA URL PÚBLICA DE ORACLE
+        // Como perdimos CloudFront, usaremos la ruta pública nativa de OCI
+        finalCoverUrl = 'https://objectstorage.$region.oraclecloud.com/n/$namespace/b/$bucketName/o/$fileName';
       }
 
       // 3. GUARDAMOS EN FIRESTORE
