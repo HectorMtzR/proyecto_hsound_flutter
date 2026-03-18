@@ -46,28 +46,38 @@ OCI_NAMESPACE=tu-namespace
 OCI_BUCKET_NAME=tu-bucket
 OCI_ACCESS_KEY=tu-access-key
 OCI_SECRET_KEY=tu-secret-key
+```
+
 Paso 2: Configuración de Firebase
 Genera los archivos de configuración específicos de la plataforma ejecutando el CLI de FlutterFire:
 
-Bash
+```
 dart pub global activate flutterfire_cli
 flutterfire configure
+```
+
 Esto generará automáticamente el archivo lib/firebase_options.dart requerido para la compilación.
 
 Paso 3: Instalación y Ejecución
 Una vez configurado el entorno, descarga las dependencias y ejecuta el proyecto:
 
-Bash
+```
 # Descargar dependencias
 flutter pub get
+```
 
 # Ejecutar en modo debug en el dispositivo conectado
+```
 flutter run
+```
+
 🔒 Buenas Prácticas y Seguridad
 ⚠️ IMPORTANTE: Nunca realices commits de los archivos .env, firebase_options.dart, ni los google-services.json. Estos archivos contienen credenciales críticas y ya están protegidos en el .gitignore base.
 
 Para despliegues de producción, se recomienda utilizar el siguiente comando para optimizar el rendimiento y ofuscar el código fuente:
 
-Bash
+```
 flutter build apk --release --obfuscate --split-debug-info=build/symbols
+```
+
 Desarrollado por Héctor Martínez Reyes - Ingeniería en Tecnologías de la Información y Negocios Digitales.
