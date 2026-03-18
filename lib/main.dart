@@ -1,30 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <-- Necesario para bloquear la orientación
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart'; 
 import 'firebase_options.dart'; 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:just_audio_background/just_audio_background.dart'; // <-- 1. IMPORT FALTANTE
+import 'package:just_audio_background/just_audio_background.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/mock/mock_repository.dart';
 import 'core/router/app_router.dart';
 
-void main() async {
-  // Aseguramos que los "bindings" de Flutter estén listos antes de llamar a código nativo
+/// Punto de entrada principal de la aplicación HSound.
+///
+/// Inicializa los servicios críticos del sistema de forma asíncrona antes 
+/// de renderizar la interfaz de usuario:
+/// - Bloqueo de la orientación de la pantalla a modo retrato (Portrait).
+/// - Carga de variables de entorno (.env).
+/// - Configuración del servicio en segundo plano para el audio.
+/// - Inicialización del SDK de Firebase.
+Future<void> main() async {
+  // Aseguramos que los "bindings" de Flutter estén listos para código nativo
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 1. Cargamos variables de entorno
+  // Bloqueamos la rotación para evitar reconstrucciones no deseadas de la UI
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown, 
+  ]);
+
+  // Carga de credenciales de Oracle/AWS desde el archivo .env
   await dotenv.load(fileName: ".env");
 
-  // 2. INICIALIZAMOS EL AUDIO EN BACKGROUND (ESTO FALTABA)
+  // Inicialización de los canales de notificación de Android para reproducción en background
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
     androidNotificationChannelName: 'Reproducción de música',
     androidNotificationOngoing: true,
-    androidNotificationIcon: 'mipmap/ic_launcher', // Usa el ícono de tu app
+    androidNotificationIcon: 'mipmap/ic_launcher',
   );
 
-  // 3. Inicializamos Firebase (una sola vez)
+  // Inicialización de la conexión con Firestore y Firebase Auth
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -37,6 +52,11 @@ void main() async {
   );
 }
 
+/// Widget raíz de la aplicación.
+///
+/// Configura el tema global oscuro y el sistema de enrutamiento dinámico [GoRouter],
+/// inyectando el repositorio de datos como dependencia para controlar el acceso
+/// según el estado de autenticación del usuario.
 class HSoundApp extends StatefulWidget {
   const HSoundApp({super.key});
 
@@ -50,7 +70,7 @@ class _HSoundAppState extends State<HSoundApp> {
   @override
   void initState() {
     super.initState();
-    // Leemos el repositorio UNA SOLA VEZ al arrancar
+    // Leemos el repositorio una sola vez al arrancar para pasárselo al enrutador
     final repo = context.read<MockRepository>();
     router = createRouter(repo);
   }

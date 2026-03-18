@@ -2,8 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../../core/mock/mock_repository.dart'; // Asegúrate de que esta ruta sea la correcta
+import 'package:go_router/go_router.dart';
+import '../../core/mock/mock_repository.dart'; 
 
+/// Pantalla para la creación de una nueva lista de reproducción.
+///
+/// Permite al usuario asignar un nombre y seleccionar una imagen desde
+/// la galería del dispositivo. Tras crearla exitosamente en el backend,
+/// redirige automáticamente a la vista de detalles de la nueva playlist.
 class CreatePlaylistScreen extends StatefulWidget {
   const CreatePlaylistScreen({super.key});
 
@@ -22,11 +28,14 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
     super.dispose();
   }
 
+  /// Abre la galería del dispositivo para que el usuario seleccione una imagen.
+  /// 
+  /// Aplica compresión para optimizar el tamaño de la subida a la nube.
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery, // Abre la galería del teléfono
-      imageQuality: 70, // Comprime la imagen
+      source: ImageSource.gallery,
+      imageQuality: 70, 
     );
     
     if (image != null) {
@@ -36,6 +45,11 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
     }
   }
 
+  /// Inicia el proceso de validación y creación de la playlist.
+  /// 
+  /// Se comunica con el repositorio para subir la portada y guardar los
+  /// metadatos. Si es exitoso, navega reemplazando la ruta actual por 
+  /// la vista de la nueva playlist.
   Future<void> _createPlaylist() async {
     if (nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,17 +61,22 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
     setState(() => isUploading = true);
     
     try {
-      await context.read<MockRepository>().createPlaylistWithImage(
+      final repo = context.read<MockRepository>();
+      
+      // Obtenemos el ID de la nueva playlist recién creada
+      final newPlaylistId = await repo.createPlaylistWithImage(
         nameCtrl.text.trim(), 
         selectedImage
       );
       
-      // Si todo sale bien, regresamos a la pantalla anterior
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        // Navegamos directamente a la nueva playlist usando pushReplacement
+        context.pushReplacement('/library/playlist/$newPlaylistId');
+      }
       
     } catch (e) {
-      setState(() => isUploading = false);
       if (mounted) {
+        setState(() => isUploading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al crear: $e')),
         );
@@ -82,7 +101,6 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
           children: [
             const SizedBox(height: 20),
             
-            // --- FOTO DE PORTADA ---
             GestureDetector(
               onTap: isUploading ? null : _pickImage,
               child: Container(
@@ -113,7 +131,6 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
             
             const SizedBox(height: 40),
             
-            // --- NOMBRE DE LA PLAYLIST ---
             TextField(
               controller: nameCtrl,
               enabled: !isUploading,
@@ -129,7 +146,6 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
             
             const SizedBox(height: 60),
             
-            // --- BOTÓN CREAR ---
             SizedBox(
               width: double.infinity,
               height: 55,

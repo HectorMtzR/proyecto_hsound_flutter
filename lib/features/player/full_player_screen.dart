@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:palette_generator/palette_generator.dart'; // <-- IMPORTANTE: El paquete de colores
+import 'package:palette_generator/palette_generator.dart';
 import '../../core/mock/mock_repository.dart';
 import '../../core/models/models.dart';
 
-// 1. Lo convertimos a StatefulWidget para poder cambiar el color de fondo
+/// Pantalla de reproducción a pantalla completa.
+///
+/// Muestra la carátula de la canción actual con una animación [Hero],
+/// controles de reproducción, barra de progreso y extrae dinámicamente
+/// el color de fondo basado en la paleta de colores de la imagen.
 class FullPlayerScreen extends StatefulWidget {
   const FullPlayerScreen({super.key});
 
@@ -13,22 +17,25 @@ class FullPlayerScreen extends StatefulWidget {
 }
 
 class _FullPlayerScreenState extends State<FullPlayerScreen> {
-  // Guardamos tu rojo tipo Canva como color por defecto por si la imagen tarda
+  /// Color de fondo dinámico. Se inicializa con el color primario de la marca.
   Color _backgroundColor = const Color(0xFFC62828); 
 
   @override
   void initState() {
     super.initState();
-    _updatePalette(); // Calculamos el color al abrir la pantalla
+    _updatePalette();
   }
 
   @override
   void didUpdateWidget(covariant FullPlayerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _updatePalette(); // Recalculamos si cambia la canción mientras la pantalla está abierta
+    _updatePalette();
   }
 
-  // 2. FUNCIÓN PARA EXTRAER EL COLOR DE LA PORTADA
+  /// Extrae el color dominante de la URL de la portada de la canción actual.
+  /// 
+  /// Si la conexión a internet falla y no se puede descargar la imagen, 
+  /// atrapa la excepción y notifica al usuario mediante un [SnackBar].
   Future<void> _updatePalette() async {
     final repo = context.read<MockRepository>();
     final track = repo.currentTrack;
@@ -40,19 +47,29 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
         NetworkImage(track.coverUrl),
         maximumColorCount: 10,
       );
+      
       if (mounted) {
         setState(() {
-          // Buscamos un color oscuro y vibrante, si no hay, usamos el dominante
           _backgroundColor = palette.darkVibrantColor?.color ?? 
                              palette.dominantColor?.color ?? 
                              const Color(0xFFC62828);
         });
       }
     } catch (e) {
-      debugPrint("Error extrayendo color: $e");
+      // Manejo de error de red (Modo Offline) al cambiar de pista
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conexión inestable. No se pudo cargar la portada de la pista.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
+  /// Formatea un objeto [Duration] a una cadena de texto (mm:ss) para la UI.
   String _formatDuration(Duration d) {
     final minutes = d.inMinutes;
     final seconds = d.inSeconds % 60;
@@ -67,7 +84,6 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     if (track == null) return const SizedBox.shrink();
 
     return Scaffold(
-      // 3. APLICAMOS EL COLOR DINÁMICO AL FONDO
       backgroundColor: _backgroundColor, 
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -90,13 +106,11 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 4. ¡AQUÍ ESTÁ EL HERO ENVOLVIENDO TU CARÁTULA!
             Hero(
-              tag: 'track_cover_${track.id}', // La misma etiqueta que pusiste en home_screen
+              tag: 'track_cover_${track.id}', 
               child: AspectRatio(
                 aspectRatio: 1,
                 child: Container(
-                  // Le agregamos una sombra sutil para que resalte más sobre el fondo dinámico
                   decoration: BoxDecoration(
                     boxShadow: [
                       BoxShadow(
@@ -106,13 +120,22 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       )
                     ]
                   ),
-                  child: Image.network(track.coverUrl, fit: BoxFit.cover),
+                  child: Image.network(track.coverUrl, fit: BoxFit.cover,
+                  
+                  // --- ESTO ATRAPA EL ERROR VISUAL DE RED ---
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[850],
+                            child: const Icon(Icons.wifi_off, color: Colors.white54, size: 40),
+                          );
+                        },
+                  
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 32),
             
-            // Título, Artista y Botón de Me Gusta
             Row(
               children: [
                 Expanded(
@@ -136,7 +159,6 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Barra de progreso interactiva
             StreamBuilder<Duration>(
               stream: repo.positionStream,
               builder: (context, snapshot) {
@@ -173,7 +195,6 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Controles de reproducción
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -198,7 +219,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   onPressed: repo.playNext,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.repeat, color: Colors.white), // Visual por ahora
+                  icon: const Icon(Icons.repeat, color: Colors.white), 
                   onPressed: () {},
                 ),
               ],
@@ -210,7 +231,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     );
   }
 
-  // --- BOTTOM SHEET DE OPCIONES ---
+  /// Muestra un menú de opciones contextual para la pista actual.
+  /// 
+  /// Permite agregar a playlist, remover de la playlist actual o encolar.
   void _showOptionsSheet(BuildContext context, MockRepository repo, Track track) {
     showModalBottomSheet(
       context: context,
@@ -232,7 +255,6 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 },
               ),
 
-              // SOLO SE MUESTRA SI ESTAMOS ESCUCHANDO DESDE UNA PLAYLIST
               if (repo.currentPlaylistContextId != null)
                 ListTile(
                   leading: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
@@ -259,7 +281,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     );
   }
 
-  // DIÁLOGO SECUNDARIO PARA SELECCIONAR A QUÉ PLAYLIST AGREGAR
+  /// Muestra un selector para añadir la pista a una de las playlists del usuario.
   void _showPlaylistSelector(BuildContext context, MockRepository repo, Track track) {
     showModalBottomSheet(
       context: context,

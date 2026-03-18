@@ -5,8 +5,15 @@ import 'package:go_router/go_router.dart';
 import '../../core/mock/mock_repository.dart';
 import '../../core/models/models.dart'; 
 
+/// Pantalla de detalles de una lista de reproducción específica.
+///
+/// Muestra la carátula, el título y la lista de pistas que la componen.
+/// Permite reproducir la lista en modo normal o aleatorio, y ofrece un 
+/// menú contextual por canción para gestionar las pistas dentro de la lista.
 class PlaylistDetailScreen extends StatelessWidget {
+  /// Identificador único de la playlist a visualizar.
   final String playlistId;
+  
   const PlaylistDetailScreen({super.key, required this.playlistId});
 
   @override
@@ -14,22 +21,32 @@ class PlaylistDetailScreen extends StatelessWidget {
     final repo = context.watch<MockRepository>();
     
     final playlistIndex = repo.userPlaylists.indexWhere((p) => p.id == playlistId);
-    if (playlistIndex == -1) return const Scaffold(body: Center(child: Text('Playlist no encontrada')));
+    
+    // Fallback visual si la playlist fue borrada o no se encuentra en memoria
+    if (playlistIndex == -1) {
+      return const Scaffold(
+        body: Center(child: Text('Playlist no encontrada o eliminada'))
+      );
+    }
     
     final playlist = repo.userPlaylists[playlistIndex];
 
     return Scaffold(
-      appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/library'))),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back), 
+          onPressed: () => context.go('/library')
+        )
+      ),
       body: Column(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Column(
               children: [
-                // --- AQUÍ ESTÁ EL CAMBIO: CONTENEDOR DE LA PORTADA INTELIGENTE ---
                 Center(
                   child: Container(
-                    width: 200, // Tamaño grande para el encabezado
+                    width: 200, 
                     height: 200,
                     decoration: BoxDecoration(
                       color: Colors.grey[900],
@@ -41,25 +58,35 @@ class PlaylistDetailScreen extends StatelessWidget {
                           offset: const Offset(0, 8)
                         )
                       ],
-                      image: playlist.coverUrl.isNotEmpty
-                          ? DecorationImage(
-                              image: NetworkImage(playlist.coverUrl),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
                     ),
-                    child: playlist.coverUrl.isEmpty
-                        ? const Icon(Icons.music_note, color: Colors.white54, size: 80)
-                        : null,
+                    child: playlist.coverUrl.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              playlist.coverUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[850],
+                                  child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
+                                );
+                              },
+                            ),
+                          )
+                        : const Icon(Icons.music_note, color: Colors.white54, size: 80),
                   ),
                 ),
-                // --- FIN DEL CONTENEDOR DE PORTADA ---
                 
                 const SizedBox(height: 24),
-                Text(playlist.name, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                Text(
+                  playlist.name, 
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 16),
                 
-                // --- BOTÓN DE REPRODUCCIÓN ALEATORIA ---
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
@@ -71,20 +98,22 @@ class PlaylistDetailScreen extends StatelessWidget {
                   label: const Text('Aleatorio', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   onPressed: () {
                     if (playlist.tracks.isNotEmpty) {
-                      if (!repo.isShuffle) {
-                        repo.toggleShuffle();
-                      }
+                      if (!repo.isShuffle) repo.toggleShuffle();
+                      
                       final randomIndex = Random().nextInt(playlist.tracks.length);
                       final randomStartingTrack = playlist.tracks[randomIndex];
                       repo.playTrackContext(randomStartingTrack, playlist.tracks, playlistId: playlist.id);
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Esta playlist no tiene canciones aún.')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Esta playlist no tiene canciones aún.'))
+                      );
                     }
                   },
                 ),
               ],
             ),
           ),
+          
           Expanded(
             child: ListView.builder(
               itemCount: playlist.tracks.length,
@@ -93,18 +122,34 @@ class PlaylistDetailScreen extends StatelessWidget {
                 final isPlaying = repo.currentTrack?.id == track.id;
                 
                 return ListTile(
-                  // Y DE PASO, APLICAMOS LA MISMA LÓGICA A LAS CANCIONES PARA PREVENIR ERRORES
                   leading: Container(
                     width: 48,
                     height: 48,
                     color: Colors.grey[800],
                     child: track.coverUrl.isNotEmpty 
-                        ? Image.network(track.coverUrl, fit: BoxFit.cover)
+                        ? Image.network(
+                            track.coverUrl, 
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.wifi_off, color: Colors.white54, size: 24);
+                            },
+                          )
                         : const Icon(Icons.music_note, color: Colors.white54),
                   ),
-                  title: Text(track.title, style: TextStyle(color: isPlaying ? Colors.redAccent : Colors.white)),
-                  subtitle: Text(track.artist),
-                  // --- CAMBIAMOS EL ÍCONO ESTÁTICO POR UN BOTÓN FUNCIONAL ---
+                  title: Text(
+                    track.title, 
+                    style: TextStyle(
+                      color: isPlaying ? Colors.redAccent : Colors.white,
+                      fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.more_vert),
                     onPressed: () => _showOptionsSheet(context, repo, track, playlist.id),
@@ -119,7 +164,7 @@ class PlaylistDetailScreen extends StatelessWidget {
     );
   }
 
-  // --- BOTTOM SHEET DE OPCIONES ---
+  /// Despliega un modal inferior con opciones contextuales para la pista seleccionada.
   void _showOptionsSheet(BuildContext context, MockRepository repo, Track track, String currentPlaylistId) {
     showModalBottomSheet(
       context: context,
@@ -130,18 +175,22 @@ class PlaylistDetailScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(margin: const EdgeInsets.only(top: 8, bottom: 16), width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[600], borderRadius: BorderRadius.circular(2))),
+              Container(
+                margin: const EdgeInsets.only(top: 8, bottom: 16), 
+                width: 40, 
+                height: 4, 
+                decoration: BoxDecoration(color: Colors.grey[600], borderRadius: BorderRadius.circular(2))
+              ),
               
               ListTile(
                 leading: const Icon(Icons.add_circle_outline, color: Colors.redAccent),
-                title: const Text('Agregar a playlist', style: TextStyle(color: Colors.redAccent)),
+                title: const Text('Agregar a otra playlist', style: TextStyle(color: Colors.redAccent)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showPlaylistSelector(context, repo, track);
                 },
               ),
 
-              // Como ya estamos dentro de una playlist, siempre mostramos la opción de eliminar
               ListTile(
                 leading: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
                 title: const Text('Eliminar de esta playlist', style: TextStyle(color: Colors.redAccent)),
@@ -157,7 +206,9 @@ class PlaylistDetailScreen extends StatelessWidget {
                 onTap: () {
                   repo.addToQueueNext(track);
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Agregada a la fila')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Agregada a la fila'))
+                  );
                 },
               ),
             ],
@@ -167,10 +218,9 @@ class PlaylistDetailScreen extends StatelessWidget {
     );
   }
 
-  // --- DIÁLOGO PARA SELECCIONAR A QUÉ PLAYLIST AGREGAR ---
-  // --- DIÁLOGO PARA SELECCIONAR A QUÉ PLAYLIST AGREGAR ---
+  /// Despliega un menú para agregar la pista a una de las listas personalizadas del usuario.
   void _showPlaylistSelector(BuildContext context, MockRepository repo, Track track) {
-    // 1. Filtramos para excluir las listas del sistema ('p_likes' y 'p_1')
+    // Filtramos las listas por defecto del sistema
     final userCreatedPlaylists = repo.userPlaylists.where(
       (p) => p.id != 'p_likes' && p.id != 'p_1'
     ).toList();
@@ -186,20 +236,20 @@ class PlaylistDetailScreen extends StatelessWidget {
               child: Text('Selecciona una playlist', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))
             ),
             
-            // 2. Si no ha creado ninguna playlist, le avisamos
             if (userCreatedPlaylists.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text('No has creado ninguna playlist personal aún.', style: TextStyle(color: Colors.white54)),
               ),
 
-            // 3. Mostramos únicamente las listas válidas
             ...userCreatedPlaylists.map((playlist) => ListTile(
               title: Text(playlist.name),
               onTap: () {
                 repo.addTrackToPlaylist(playlist.id, track);
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Agregada a ${playlist.name}')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Agregada a ${playlist.name}'))
+                );
               },
             )),
           ],

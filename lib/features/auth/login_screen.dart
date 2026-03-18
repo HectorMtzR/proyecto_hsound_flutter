@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/mock/mock_repository.dart';
 
+/// Pantalla de autenticación principal de la aplicación.
+/// 
+/// Permite a los usuarios iniciar sesión en una cuenta existente o 
+/// registrar una nueva. Maneja la validación local básica y gestiona 
+/// los estados de carga y errores de red durante la comunicación con el backend.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -10,14 +15,15 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Estados para controlar la vista
+  /// Define si la vista actual es para Iniciar Sesión (true) o Registro (false).
   bool isLogin = true; 
+  
+  /// Indica si hay una petición asíncrona en proceso para mostrar el indicador de carga.
   bool isLoading = false;
 
-  // Controladores de texto
-  final emailCtrl = TextEditingController();
-  final passCtrl = TextEditingController();
-  final nameCtrl = TextEditingController(); // Necesario para el registro
+  final TextEditingController emailCtrl = TextEditingController();
+  final TextEditingController passCtrl = TextEditingController();
+  final TextEditingController nameCtrl = TextEditingController();
 
   @override
   void dispose() {
@@ -27,9 +33,12 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // Función principal que se comunica con Firebase
+  /// Procesa el formulario, valida los datos e interactúa con el repositorio.
+  ///
+  /// Intercepta errores de Firebase y de red para proveer retroalimentación
+  /// visual al usuario mediante un [SnackBar].
   Future<void> _submit() async {
-    // Escondemos el teclado
+    // Cierra el teclado virtual de la pantalla
     FocusScope.of(context).unfocus(); 
     
     setState(() => isLoading = true);
@@ -44,18 +53,31 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         await repo.register(emailCtrl.text.trim(), passCtrl.text.trim(), nameCtrl.text.trim());
       }
-      // Nota: Si Firebase responde con éxito, 'currentUser' se actualiza.
-      // El 'app_router.dart' detecta este cambio automáticamente y te lanza a '/home'.
     } catch (e) {
-      // Si hay error (ej. contraseña corta, correo ya existe), lo mostramos
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')), 
-          backgroundColor: Colors.black87
-        ),
-      );
+      final String errorString = e.toString();
+      String userMessage = 'Ocurrió un error inesperado.';
+
+      // Validación de conectividad (Modo Offline)
+      if (errorString.contains('network-request-failed') || errorString.contains('SocketException')) {
+        userMessage = 'Sin conexión a internet. Revisa tu red y vuelve a intentarlo.';
+      } else {
+        // Limpiamos prefijos técnicos para mostrar un mensaje amigable
+        userMessage = errorString.replaceAll('Exception: ', '').split(']').last.trim();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(userMessage), 
+            backgroundColor: Colors.black87,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -64,15 +86,17 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.red[900],
       body: Center(
-        child: SingleChildScrollView( // Evita que el teclado tape los inputs
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('HSound', style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Text(
+                'HSound', 
+                style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white)
+              ),
               const SizedBox(height: 40),
               
-              // Solo mostramos el campo de Nombre si estamos en modo "Registro"
               if (!isLogin) ...[
                 TextField(
                   controller: nameCtrl,
@@ -116,7 +140,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 32),
               
-              // Mostramos la rueda de carga o el botón dependiendo del estado
               isLoading
                   ? const CircularProgressIndicator(color: Colors.white)
                   : ElevatedButton(
@@ -133,20 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
               
               const SizedBox(height: 16),
               
-              // Botón para alternar entre modos
               TextButton(
-                onPressed: () {
-                  setState(() {
-                    isLogin = !isLogin;
-                  });
-                },
+                onPressed: () => setState(() => isLogin = !isLogin),
                 child: Text(
                   isLogin ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión',
                   style: const TextStyle(color: Colors.white70),
                 ),
               )
-
-
             ],
           ),
         ),
