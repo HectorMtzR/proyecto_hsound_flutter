@@ -4,27 +4,31 @@ import 'package:just_audio/just_audio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import '../models/models.dart';
-import 'dart:io'; // Para manejar el archivo de la foto
+import 'dart:io';
 import 'package:minio/minio.dart';
 import 'package:uuid/uuid.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
+/// Repositorio principal de la aplicación.
+///
+/// Actúa como la única fuente de la verdad (Single Source of Truth) conectando
+/// la interfaz de usuario con los servicios de Firebase (Auth, Firestore) y Oracle Cloud (OCI).
+/// Gestiona el estado global de reproducción de audio usando [just_audio].
 class MockRepository extends ChangeNotifier {
   User? currentUser;
   Track? currentTrack;
   bool isPlaying = false;
   
-  // --- Lógica de Reproducción ---
+  // --- Estados de Reproducción ---
   bool isShuffle = false;
   List<Track> currentQueue = [];
   int currentQueueIndex = -1;
   String? currentPlaylistContextId; 
-
   List<Track> upNextQueue = []; 
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  // Instancias reales de Firebase
+  // Instancias de Firebase
   final _firebaseAuth = firebase_auth.FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
@@ -32,26 +36,25 @@ class MockRepository extends ChangeNotifier {
   Stream<Duration?> get durationStream => _audioPlayer.durationStream;
   Duration get currentDuration => _audioPlayer.duration ?? Duration.zero;
 
-  // --- VARIABLES DE DATOS REALES ---
-  List<Track> allTracks = []; // Ahora inicia vacía, se llenará desde Firebase
+  // --- Datos del Catálogo ---
+  List<Track> allTracks = []; 
   late List<Playlist> userPlaylists;
   List<String> likedTrackIds = []; 
-  bool isLoadingTracks = false; // Indicador de carga para la UI
+  bool isLoadingTracks = false; 
 
   MockRepository() {
-    // Inicializamos las playlists base
     userPlaylists = [
       Playlist(id: 'p_likes', name: 'Tus me gusta', tracks: []),
       Playlist(id: 'p_1', name: 'Mi Mix', tracks: []), 
     ];
 
-    // 1. Escuchamos si le ponen pausa o play
+    // Escucha de estado de reproducción nativa
     _audioPlayer.playerStateStream.listen((state) {
       isPlaying = state.playing;
       notifyListeners();
     });
 
-    // 2. ¡NUEVO! Escuchamos cuando Android cambia de canción (desde la app o pantalla de bloqueo)
+    // Escucha de cambio de pista (app o background)
     _audioPlayer.currentIndexStream.listen((index) {
       if (index != null && currentQueue.isNotEmpty && index < currentQueue.length) {
         currentQueueIndex = index;
@@ -63,27 +66,24 @@ class MockRepository extends ChangeNotifier {
     _checkAuthState();
   }
 
-  // --- LÓGICA DE AGRUPACIÓN POR ÁLBUMES (EN MEMORIA) ---
-  
-  // Usamos un "getter" para que se calcule automáticamente cada vez que se pida,
-  // asegurando que siempre tenga la información más fresca de allTracks.
+  /// Agrupa las pistas del catálogo actual por el nombre de su álbum.
+  /// 
+  /// Retorna un mapa donde la llave es el nombre del álbum y el valor es la lista de [Track].
   Map<String, List<Track>> get groupedByAlbum {
     final Map<String, List<Track>> albumMap = {};
-
     for (var track in allTracks) {
-      // Si la caja de este álbum aún no existe en el diccionario, la creamos vacía
       if (!albumMap.containsKey(track.album)) {
         albumMap[track.album] = [];
       }
-      // Metemos la canción a su caja correspondiente
       albumMap[track.album]!.add(track);
     }
-
     return albumMap;
   }
 
-
-  // --- MÉTODO PARA DESCARGAR CANCIONES DESDE FIRESTORE ---
+  /// Descarga el catálogo global de canciones desde Firestore.
+  /// 
+  /// Falla silenciosamente en caso de error de red para usar la caché de Firebase,
+  /// evitando que la aplicación se cierre inesperadamente en el inicio.
   Future<void> fetchTracksFromFirebase() async {
     isLoadingTracks = true;
     notifyListeners(); 
@@ -101,61 +101,52 @@ class MockRepository extends ChangeNotifier {
           album: data['album'] ?? 'Sencillo',
           coverUrl: data['coverUrl'] ?? '',
           audioUrl: data['audioUrl'] ?? '',
-          duration: data['duration'] ?? '0:00', // Agregamos un fallback por si falta
+          duration: data['duration'] ?? '0:00',
         ));
       }
 
-      // Llenamos la playlist "Mi Mix" con las canciones recién descargadas (máximo 10)
       if (allTracks.isNotEmpty) {
         final miMix = userPlaylists.firstWhere((p) => p.id == 'p_1');
         miMix.tracks.clear();
         miMix.tracks.addAll(allTracks.take(10));
       }
-
-    } catch (e) {
-      debugPrint("Error al cargar canciones: $e");
+    } catch (_) {
+      // Se omite el log en producción para mantener la consola limpia.
+      // Firestore intentará usar la caché automáticamente.
     } finally {
       isLoadingTracks = false;
       notifyListeners(); 
     }
   }
 
-  // --- MÉTODO PARA DESCARGAR LAS PLAYLISTS DEL USUARIO ---
+  /// Descarga las listas de reproducción creadas por el usuario autenticado.
   Future<void> fetchUserPlaylists() async {
     if (currentUser == null) return;
 
     try {
-      // 1. Hacemos la consulta filtrando por el ID del usuario (Relación)
       final snapshot = await _firestore
           .collection('playlists')
           .where('ownerId', isEqualTo: currentUser!.id)
           .get();
 
-      // 2. Rescatamos las playlists por defecto ("Tus me gusta" y "Mi Mix")
       final likesPlaylist = userPlaylists.firstWhere((p) => p.id == 'p_likes');
       final miMix = userPlaylists.firstWhere((p) => p.id == 'p_1');
 
-      // 3. Limpiamos la lista para evitar duplicados en Hot Reloads
       userPlaylists.clear();
       userPlaylists.add(likesPlaylist);
       userPlaylists.add(miMix);
 
-      // 4. Convertimos los documentos de Firebase en objetos Playlist de Flutter
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        
-        // Extraemos los IDs de las canciones guardadas en esta playlist
         List<dynamic> dbTrackIds = data['trackIds'] ?? [];
         List<Track> playlistTracks = [];
 
-        // Buscamos cada ID en nuestro catálogo global y lo agregamos a la lista
         for (var trackId in dbTrackIds) {
           try {
-            // Usamos firstWhere para encontrar la canción real en allTracks
             final track = allTracks.firstWhere((t) => t.id == trackId.toString());
             playlistTracks.add(track);
-          } catch (e) {
-            // Si la canción ya no existe en el catálogo, la ignoramos silenciosamente
+          } catch (_) {
+            // Ignorar referencias huérfanas
           }
         }
 
@@ -163,59 +154,62 @@ class MockRepository extends ChangeNotifier {
           id: doc.id,
           name: data['name'] ?? 'Playlist',
           coverUrl: data['coverUrl'] ?? '',
-          tracks: playlistTracks, // ¡Ahora inyectamos las canciones reales aquí!
+          tracks: playlistTracks,
         ));
       }
-
-      notifyListeners(); // Avisamos a la UI que ya llegaron las listas
-    } catch (e) {
-      debugPrint("Error al cargar playlists: $e");
+      notifyListeners();
+    } catch (_) {
+      // Manejo silencioso para usar caché
     }
   }
 
-  // --- LÓGICA DE SESIÓN Y SINCRONIZACIÓN ---
+  /// Monitorea el estado de autenticación de Firebase en tiempo real.
   void _checkAuthState() {
     _firebaseAuth.authStateChanges().listen((firebaseUser) async {
       if (firebaseUser != null) {
-        final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
-        if (doc.exists) {
-          currentUser = User(
-            id: firebaseUser.uid, 
-            displayName: doc.data()?['displayName'] ?? 'Usuario', 
-            email: firebaseUser.email!
-          );
+        try {
+          final doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+          if (doc.exists) {
+            currentUser = User(
+              id: firebaseUser.uid, 
+              displayName: doc.data()?['displayName'] ?? 'Usuario', 
+              email: firebaseUser.email!
+            );
 
-          List<dynamic> dbLikes = doc.data()?['liked_tracks'] ?? [];
-          likedTrackIds = dbLikes.map((e) => e.toString()).toList();
+            List<dynamic> dbLikes = doc.data()?['liked_tracks'] ?? [];
+            likedTrackIds = dbLikes.map((e) => e.toString()).toList();
 
-          // 1. DESCARGAMOS EL CATÁLOGO DE CANCIONES
-          await fetchTracksFromFirebase();
+            await fetchTracksFromFirebase();
+            await fetchUserPlaylists();
+            _syncLikesPlaylist();
 
-          // 2. DESCARGAMOS LAS PLAYLISTS DEL USUARIO (NUEVO)
-          await fetchUserPlaylists();
-
-          // 3. SINCRONIZAMOS LOS LIKES (Ahora sí encontrará las canciones)
-          _syncLikesPlaylist();
-
-          notifyListeners();
+            notifyListeners();
+          }
+        } catch (_) {
+          // Error de red al iniciar, la app usará caché si está disponible
         }
       } else {
         currentUser = null;
         likedTrackIds.clear(); 
-        allTracks.clear(); // Limpiamos el catálogo por seguridad
+        allTracks.clear(); 
         _syncLikesPlaylist();
         notifyListeners();
       }
     });
   }
 
+  /// Sincroniza la lista virtual de "Me Gusta" con el catálogo local.
   void _syncLikesPlaylist() {
     final likesPlaylist = userPlaylists.firstWhere((p) => p.id == 'p_likes');
     likesPlaylist.tracks.clear();
     likesPlaylist.tracks.addAll(allTracks.where((t) => likedTrackIds.contains(t.id)));
   }
 
-  // --- MÉTODOS DE AUTENTICACIÓN ---
+  // --- MÉTODOS DE AUTENTICACIÓN (Con manejo de red) ---
+
+  /// Registra un nuevo usuario en Firebase Auth y crea su documento en Firestore.
+  /// 
+  /// Lanza excepciones formateadas listas para ser mostradas en la interfaz.
   Future<void> register(String email, String password, String displayName) async {
     try {
       final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
@@ -229,21 +223,31 @@ class MockRepository extends ChangeNotifier {
         'liked_tracks': [], 
         'createdAt': FieldValue.serverTimestamp(),
       });
-    } catch (e) {
-      debugPrint("Error al registrar: $e");
-      rethrow; 
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      if (e.code.contains('network') || e.code == 'unknown') {
+        throw Exception('Sin conexión a internet. Revisa tu red.');
+      }
+      throw Exception(e.message ?? 'Error al registrar.');
+    } catch (_) {
+      throw Exception('Ocurrió un error inesperado al registrar.');
     }
   }
 
+  /// Inicia sesión con un usuario existente en Firebase Auth.
   Future<void> login(String email, String password) async {
     try {
       await _firebaseAuth.signInWithEmailAndPassword(email: email, password: password);
-    } catch (e) {
-      debugPrint("Error al iniciar sesión: $e");
-      rethrow;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      if (e.code.contains('network') || e.code == 'unknown') {
+        throw Exception('Sin conexión a internet. Revisa tu red.');
+      }
+      throw Exception(e.message ?? 'Credenciales incorrectas.');
+    } catch (_) {
+      throw Exception('Ocurrió un error inesperado al iniciar sesión.');
     }
   }
 
+  /// Cierra la sesión del usuario actual y detiene el reproductor.
   Future<void> logout() async {
     await _firebaseAuth.signOut();
     currentTrack = null;
@@ -251,20 +255,18 @@ class MockRepository extends ChangeNotifier {
     notifyListeners(); 
   }
   
-
-  // --- MÉTODOS DE REPRODUCCIÓN 2.0 (Nativo y Background) ---
+  // --- MÉTODOS DE REPRODUCCIÓN ---
   
+  /// Inicia la reproducción de una pista en un contexto específico (Lista global o Playlist).
   Future<void> playTrackContext(Track track, List<Track> contextQueue, {String? playlistId}) async {
     currentQueue = List.from(contextQueue);
     currentQueueIndex = currentQueue.indexWhere((t) => t.id == track.id);
     currentPlaylistContextId = playlistId;
 
-    // Actualizamos la UI inmediatamente para que no se sienta lag
     currentTrack = track;
     notifyListeners(); 
 
     try {
-      // 1. Convertimos toda tu lista en AudioSources con sus etiquetas de imagen para Android
       final audioSources = currentQueue.map((t) => AudioSource.uri(
         Uri.parse(t.audioUrl),
         tag: MediaItem(
@@ -275,10 +277,8 @@ class MockRepository extends ChangeNotifier {
         ),
       )).toList();
 
-      // 2. Empaquetamos todo en una Playlist oficial de just_audio
       final playlist = ConcatenatingAudioSource(children: audioSources);
 
-      // 3. Cargamos la playlist completa y le decimos en qué número arrancar
       await _audioPlayer.setAudioSource(
         playlist,
         initialIndex: currentQueueIndex, 
@@ -286,8 +286,8 @@ class MockRepository extends ChangeNotifier {
       );
       
       _audioPlayer.play();
-    } catch (e) {
-      debugPrint("Error al reproducir audio en contexto: $e");
+    } catch (_) {
+      // Falla al cargar el audio, probablemente por red.
     }
   }
 
@@ -295,26 +295,18 @@ class MockRepository extends ChangeNotifier {
     _audioPlayer.playing ? _audioPlayer.pause() : _audioPlayer.play();
   }
 
-  // Ahora delegamos los controles a la máquina interna de just_audio
   void playNext() {
-    if (_audioPlayer.hasNext) {
-      _audioPlayer.seekToNext();
-    }
+    if (_audioPlayer.hasNext) _audioPlayer.seekToNext();
   }
 
   void playPrevious() {
-    if (_audioPlayer.hasPrevious) {
-      _audioPlayer.seekToPrevious();
-    }
+    if (_audioPlayer.hasPrevious) _audioPlayer.seekToPrevious();
   }
 
-  // just_audio también maneja el aleatorio de manera nativa y robusta
   Future<void> toggleShuffle() async {
     isShuffle = !isShuffle;
     await _audioPlayer.setShuffleModeEnabled(isShuffle);
-    if (isShuffle) {
-      await _audioPlayer.shuffle();
-    }
+    if (isShuffle) await _audioPlayer.shuffle();
     notifyListeners();
   }
 
@@ -322,7 +314,7 @@ class MockRepository extends ChangeNotifier {
     _audioPlayer.seek(position);
   }
 
-  // Agrega canciones dinámicamente sin interrumpir la música actual
+  /// Agrega una pista a la cola de reproducción inmediatamente después de la actual.
   void addToQueueNext(Track track) async {
     if (_audioPlayer.audioSource is ConcatenatingAudioSource) {
       final playlist = _audioPlayer.audioSource as ConcatenatingAudioSource;
@@ -334,16 +326,16 @@ class MockRepository extends ChangeNotifier {
       );
       
       await playlist.insert(nextIndex, newSource);
-      currentQueue.insert(nextIndex, track); // Actualizamos la lista local
+      currentQueue.insert(nextIndex, track); 
       notifyListeners();
     }
   }
 
   // --- MÉTODOS DE LIKES Y PLAYLISTS ---
-  bool isLiked(Track track) {
-    return likedTrackIds.contains(track.id);
-  }
 
+  bool isLiked(Track track) => likedTrackIds.contains(track.id);
+
+  /// Alterna el estado de "Me Gusta" de una pista y sincroniza con Firestore.
   Future<void> toggleLike(Track track) async {
     if (currentUser == null) return; 
 
@@ -354,78 +346,67 @@ class MockRepository extends ChangeNotifier {
       likedTrackIds.remove(track.id);
       _syncLikesPlaylist();
       notifyListeners();
-      await userRef.update({
-        'liked_tracks': FieldValue.arrayRemove([track.id])
-      });
+      try {
+        await userRef.update({'liked_tracks': FieldValue.arrayRemove([track.id])});
+      } catch (_) {}
     } else {
       likedTrackIds.add(track.id);
       _syncLikesPlaylist();
       notifyListeners();
-      await userRef.update({
-        'liked_tracks': FieldValue.arrayUnion([track.id])
-      });
+      try {
+        await userRef.update({'liked_tracks': FieldValue.arrayUnion([track.id])});
+      } catch (_) {}
     }
   }
 
   Future<void> addTrackToPlaylist(String playlistId, Track track) async {
     final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
     
-    // Evitar duplicados localmente
     if (!playlist.tracks.any((t) => t.id == track.id)) {
-      // 1. Actualización Optimista (UI)
       playlist.tracks.add(track);
       notifyListeners();
 
-      // 2. Actualización en Firestore
       try {
         await _firestore.collection('playlists').doc(playlistId).update({
           'trackIds': FieldValue.arrayUnion([track.id])
         });
-      } catch (e) {
-        debugPrint("Error al agregar canción a Firestore: $e");
-      }
+      } catch (_) {}
     }
   }
 
   Future<void> removeTrackFromPlaylist(String playlistId, Track track) async {
     final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
     
-    // 1. Actualización Optimista (UI)
     playlist.tracks.removeWhere((t) => t.id == track.id);
     notifyListeners();
 
-    // 2. Actualización en Firestore
     try {
       await _firestore.collection('playlists').doc(playlistId).update({
         'trackIds': FieldValue.arrayRemove([track.id])
       });
-    } catch (e) {
-      debugPrint("Error al eliminar canción de Firestore: $e");
-    }
+    } catch (_) {}
   }
 
-  // --- NUEVA CREACIÓN DE PLAYLISTS CON CÁMARA (AWS S3) Y FIRESTORE ---
-  Future<void> createPlaylistWithImage(String name, File? imageFile) async {
-    if (currentUser == null) return;
+  /// Crea una nueva playlist subiendo primero su portada a Oracle Cloud (OCI).
+  Future<String> createPlaylistWithImage(String name, File? imageFile) async {
+    if (currentUser == null) throw Exception('No user');;
     
     String finalCoverUrl = ''; 
-    final playlistId = const Uuid().v4(); // Generamos un ID único
+    final playlistId = const Uuid().v4(); 
 
     try {
-      // 1. SUBIDA A ORACLE CLOUD (OCI COMPATIBLE CON S3)
       if (imageFile != null) {
         final region = dotenv.env['OCI_REGION'] ?? '';
         final namespace = dotenv.env['OCI_NAMESPACE'] ?? '';
         final bucketName = dotenv.env['OCI_BUCKET_NAME'] ?? '';
         
-        // El endpoint mágico que convierte a Oracle en un clon de S3
         final ociEndpoint = '$namespace.compat.objectstorage.$region.oraclecloud.com';
 
         final minio = Minio(
           endPoint: ociEndpoint,
           accessKey: dotenv.env['OCI_ACCESS_KEY'] ?? '',
           secretKey: dotenv.env['OCI_SECRET_KEY'] ?? '',
-          useSSL: true, // OCI exige conexión segura
+          useSSL: true, 
         );
 
         final extension = imageFile.path.split('.').last;
@@ -433,7 +414,6 @@ class MockRepository extends ChangeNotifier {
         final bytes = await imageFile.readAsBytes();
         final stream = Stream.value(bytes);
 
-        // Subimos el objeto
         await minio.putObject(
           bucketName, 
           fileName, 
@@ -442,12 +422,9 @@ class MockRepository extends ChangeNotifier {
           metadata: {'Content-Type': 'image/$extension'}, 
         );
         
-        // 2. CONSTRUIMOS LA URL PÚBLICA DE ORACLE
-        // Como perdimos CloudFront, usaremos la ruta pública nativa de OCI
         finalCoverUrl = 'https://objectstorage.$region.oraclecloud.com/n/$namespace/b/$bucketName/o/$fileName';
       }
 
-      // 3. GUARDAMOS EN FIRESTORE
       final newPlaylistRef = _firestore.collection('playlists').doc(playlistId);
       
       await newPlaylistRef.set({
@@ -458,7 +435,6 @@ class MockRepository extends ChangeNotifier {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 4. ACTUALIZACIÓN OPTIMISTA EN LA UI
       userPlaylists.add(Playlist(
         id: playlistId, 
         name: name, 
@@ -468,30 +444,23 @@ class MockRepository extends ChangeNotifier {
       
       notifyListeners();
 
-    } catch (e) {
-      debugPrint("Error al crear la playlist: $e");
-      rethrow;
+      return playlistId;
+
+    } catch (_) {
+      throw Exception('Fallo al crear la playlist. Revisa tu conexión.');
     }
   }
 
-  // --- MÉTODO PARA ELIMINAR PLAYLIST ---
+  /// Elimina una playlist de Firestore y de la memoria local.
   Future<void> deletePlaylist(String playlistId) async {
-    // 1. Candado de seguridad: No borrar las listas del sistema
     if (playlistId == 'p_likes' || playlistId == 'p_1') return;
 
     try {
-      // 2. Eliminamos el documento de Firestore
       await _firestore.collection('playlists').doc(playlistId).delete();
-
-      // 3. Actualizamos la UI localmente
       userPlaylists.removeWhere((p) => p.id == playlistId);
       notifyListeners();
-
-      // Nota técnica: Idealmente aquí también nos conectaríamos a S3 
-      // para borrar la foto, pero por tiempo, dejaremos que se quede huérfana en el bucket.
-    } catch (e) {
-      debugPrint("Error al eliminar la playlist: $e");
-      rethrow;
+    } catch (_) {
+      throw Exception('No se pudo eliminar la playlist por problemas de red.');
     }
   }
 
@@ -500,5 +469,4 @@ class MockRepository extends ChangeNotifier {
     _audioPlayer.dispose();
     super.dispose();
   }
-
 }

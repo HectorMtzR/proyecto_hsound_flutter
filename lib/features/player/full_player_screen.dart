@@ -120,7 +120,17 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       )
                     ]
                   ),
-                  child: Image.network(track.coverUrl, fit: BoxFit.cover),
+                  child: Image.network(track.coverUrl, fit: BoxFit.cover,
+                  
+                  // --- ESTO ATRAPA EL ERROR VISUAL DE RED ---
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[850],
+                            child: const Icon(Icons.wifi_off, color: Colors.white54, size: 40),
+                          );
+                        },
+                  
+                  ),
                 ),
               ),
             ),
