@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/mock/mock_repository.dart';
 
+/// Pantalla de detalles de un álbum específico.
+///
+/// Muestra la portada del álbum en un [SliverAppBar] que se encoge 
+/// dinámicamente al hacer scroll. Lista todas las pistas agrupadas 
+/// bajo este álbum y permite su reproducción en contexto continuo.
 class AlbumDetailScreen extends StatelessWidget {
+  /// Nombre del álbum a mostrar. Se utiliza como llave para filtrar el catálogo.
   final String albumName;
 
   const AlbumDetailScreen({super.key, required this.albumName});
@@ -10,7 +16,7 @@ class AlbumDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = context.watch<MockRepository>();
-    // Filtramos las canciones que pertenecen a este álbum
+    
     final albumTracks = repo.groupedByAlbum[albumName] ?? [];
     final firstTrack = albumTracks.isNotEmpty ? albumTracks.first : null;
 
@@ -18,7 +24,6 @@ class AlbumDetailScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: CustomScrollView(
         slivers: [
-          // AppBar con la imagen del álbum que se encoge al hacer scroll
           SliverAppBar(
             expandedHeight: 300,
             pinned: true,
@@ -26,12 +31,20 @@ class AlbumDetailScreen extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               title: Text(albumName, style: const TextStyle(fontWeight: FontWeight.bold)),
               background: firstTrack != null
-                  ? Image.network(firstTrack.coverUrl, fit: BoxFit.cover)
-                  : const Icon(Icons.album, size: 100),
+                  ? Image.network(
+                      firstTrack.coverUrl, 
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[850],
+                          child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
+                        );
+                      },
+                    )
+                  : const Icon(Icons.album, size: 100, color: Colors.white54),
             ),
           ),
           
-          // Lista de canciones del álbum
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
