@@ -3,6 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/mock/mock_repository.dart';
 
+/// Pantalla de Biblioteca Principal del usuario.
+///
+/// Implementa un [DefaultTabController] para navegar entre dos vistas:
+/// 1. Playlists: Listado de listas de reproducción creadas por el usuario o el sistema.
+/// 2. Álbumes: Vista en cuadrícula agrupando dinámicamente el catálogo por álbum.
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
 
@@ -10,9 +15,8 @@ class LibraryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final repo = context.watch<MockRepository>();
 
-    // 1. Envolvemos todo en un controlador de pestañas
     return DefaultTabController(
-      length: 2, // Le decimos que habrá exactamente 2 pestañas
+      length: 2, 
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Tu Biblioteca'),
@@ -23,9 +27,8 @@ class LibraryScreen extends StatelessWidget {
               onPressed: () => context.push('/library/create'),
             ),
           ],
-          // 2. LA BARRA DE PESTAÑAS (TabBar)
           bottom: const TabBar(
-            indicatorColor: Colors.redAccent, // La rayita de abajo
+            indicatorColor: Colors.redAccent, 
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white54,
             tabs: [
@@ -35,15 +38,15 @@ class LibraryScreen extends StatelessWidget {
           ),
         ),
         
-        // 3. EL CONTENIDO DE LAS PESTAÑAS (TabBarView)
         body: TabBarView(
           children: [
-            // --- PESTAÑA 1: TUS PLAYLISTS (Lo que ya tenías) ---
+            // --- VISTA 1: TUS PLAYLISTS ---
             ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: repo.userPlaylists.length,
               itemBuilder: (context, index) {
                 final playlist = repo.userPlaylists[index];
+                
                 return ListTile(
                   contentPadding: const EdgeInsets.only(bottom: 16),
                   leading: Container(
@@ -63,19 +66,20 @@ class LibraryScreen extends StatelessWidget {
                   title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                   subtitle: Text('${playlist.tracks.length} canciones', style: const TextStyle(color: Colors.white54)),
                   onTap: () => context.push('/library/playlist/${playlist.id}'),
-
                   onLongPress: () {
-
-                    if (playlist.name == 'Tus me gusta' || playlist.name == 'Mi Mix') {
+                    // Candado de seguridad para proteger entidades del sistema
+                    final nameLower = playlist.name.toLowerCase();
+                    if (nameLower.contains('me gusta') || nameLower.contains('mix')) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('No puedes eliminar las playlists del sistema'),
                           backgroundColor: Colors.redAccent,
                         ),
                       );
-                      return; // Cortamos la ejecución aquí, el diálogo nunca se abrirá
+                      return; 
                     }
 
+                    // Diálogo de confirmación para eliminar
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
@@ -89,7 +93,6 @@ class LibraryScreen extends StatelessWidget {
                           ),
                           TextButton(
                             onPressed: () {
-                              // Ejecutamos la función de tu repositorio para borrar
                               repo.deletePlaylist(playlist.id); 
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -106,28 +109,23 @@ class LibraryScreen extends StatelessWidget {
               },
             ),
 
-            // --- PESTAÑA 2: TUS ÁLBUMES (La nueva vista en Cuadrícula) ---
+            // --- VISTA 2: ÁLBUMES EN CUADRÍCULA ---
             GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // Dos columnas
+                crossAxisCount: 2, 
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.7, // Para que el texto quepa debajo de la imagen
+                childAspectRatio: 0.7, 
               ),
               itemCount: repo.groupedByAlbum.length,
               itemBuilder: (context, index) {
-                // Magia de Diccionarios: Extraemos el nombre del álbum (La llave)
                 final albumName = repo.groupedByAlbum.keys.elementAt(index);
-                // Extraemos las canciones que viven dentro de esa llave
                 final albumTracks = repo.groupedByAlbum[albumName]!;
-                // Tomamos la portada de la primera canción para representar todo el disco
                 final firstTrack = albumTracks.first;
 
                 return GestureDetector(
-                  onTap: () {
-                    context.push('/library/album/$albumName');
-                  },
+                  onTap: () => context.push('/library/album/$albumName'),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -136,9 +134,19 @@ class LibraryScreen extends StatelessWidget {
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            image: DecorationImage(
-                              image: NetworkImage(firstTrack.coverUrl),
+                            color: Colors.grey[850],
+                          ),
+                          // Implementación de imagen con escudo de red
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              firstTrack.coverUrl,
                               fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Center(
+                                  child: Icon(Icons.wifi_off, color: Colors.white54, size: 40),
+                                );
+                              },
                             ),
                           ),
                         ),
