@@ -3,6 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/mock/mock_repository.dart';
 
+/// Pantalla principal (Inicio) de la aplicación.
+///
+/// Muestra una cuadrícula (Grid) con todas las canciones disponibles en el catálogo.
+/// Implementa animaciones [Hero] en las carátulas para transiciones fluidas hacia 
+/// el reproductor de pantalla completa y resalta visualmente la pista actual en reproducción.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -14,7 +19,10 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Biblioteca de canciones'),
         actions: [
-          IconButton(icon: const Icon(Icons.settings), onPressed: () => context.push('/settings')),
+          IconButton(
+            icon: const Icon(Icons.settings), 
+            onPressed: () => context.push('/settings')
+          ),
         ],
       ),
       body: GridView.builder(
@@ -37,17 +45,19 @@ class HomeScreen extends StatelessWidget {
               children: [
                 AspectRatio(
                   aspectRatio: 1, 
-                  // --- AQUÍ ENVOLVEMOS TU CONTENEDOR DE LA IMAGEN CON EL HERO ---
                   child: Hero(
-                    tag: 'track_cover_${track.id}', // La etiqueta única
+                    tag: 'track_cover_${track.id}',
                     child: Container(
                       decoration: BoxDecoration(
                         border: isPlaying ? Border.all(color: Colors.redAccent, width: 3) : null,
                       ),
-                      child: Image.network(track.coverUrl, fit: BoxFit.cover, width: double.infinity),
+                      child: Image.network(
+                        track.coverUrl, 
+                        fit: BoxFit.cover, 
+                        width: double.infinity
+                      ),
                     ),
                   ),
-                  // -----------------------------------------------------------------
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -70,7 +80,6 @@ class HomeScreen extends StatelessWidget {
           );
         },
       ),
-
     );
   }
 }
