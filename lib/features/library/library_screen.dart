@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -49,19 +50,35 @@ class LibraryScreen extends StatelessWidget {
                 
                 return ListTile(
                   contentPadding: const EdgeInsets.only(bottom: 16),
-                  leading: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800],
-                      borderRadius: BorderRadius.circular(4),
-                      image: playlist.coverUrl.isNotEmpty
-                          ? DecorationImage(image: NetworkImage(playlist.coverUrl), fit: BoxFit.cover)
-                          : null,
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: playlist.coverUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: playlist.coverUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[850],
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey[800],
+                                child: const Icon(Icons.music_note, color: Colors.white54),
+                              ),
+                            )
+                          : Container(
+                              color: Colors.grey[800],
+                              child: const Icon(Icons.music_note, color: Colors.white54),
+                            ),
                     ),
-                    child: playlist.coverUrl.isEmpty
-                        ? const Icon(Icons.music_note, color: Colors.white54)
-                        : null,
                   ),
                   title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                   subtitle: Text('${playlist.tracks.length} canciones', style: const TextStyle(color: Colors.white54)),
@@ -139,14 +156,18 @@ class LibraryScreen extends StatelessWidget {
                           // Implementación de imagen con escudo de red
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              firstTrack.coverUrl,
+                            child: CachedNetworkImage(
+                              imageUrl: firstTrack.coverUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                  child: Icon(Icons.wifi_off, color: Colors.white54, size: 40),
-                                );
-                              },
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[900],
+                                child: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => const Center(
+                                child: Icon(Icons.wifi_off, color: Colors.white54, size: 40),
+                              ),
                             ),
                           ),
                         ),

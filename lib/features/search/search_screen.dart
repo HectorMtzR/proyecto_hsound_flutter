@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/mock/mock_repository.dart';
@@ -88,16 +89,28 @@ class _SearchScreenState extends State<SearchScreen> {
                     final isPlaying = repo.currentTrack?.id == track.id;
 
                     return ListTile(
-                      leading: Container(
+                      leading: SizedBox(
                         width: 48,
                         height: 48,
-                        color: Colors.grey[850],
-                        child: Image.network(
-                          track.coverUrl, 
+                        child: CachedNetworkImage(
+                          imageUrl: track.coverUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.wifi_off, color: Colors.white54, size: 24);
-                          },
+                          width: 48,
+                          height: 48,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey[850],
+                            child: const Center(
+                              child: SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: Colors.grey[850],
+                            child: const Icon(Icons.wifi_off, color: Colors.white54, size: 24),
+                          ),
                         ),
                       ),
                       title: Text(

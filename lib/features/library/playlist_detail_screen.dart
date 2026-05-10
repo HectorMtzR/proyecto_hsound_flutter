@@ -1,9 +1,10 @@
 import 'dart:math';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/mock/mock_repository.dart';
-import '../../core/models/models.dart'; 
+import '../../core/models/models.dart';
 
 /// Pantalla de detalles de una lista de reproducción específica.
 ///
@@ -62,15 +63,21 @@ class PlaylistDetailScreen extends StatelessWidget {
                     child: playlist.coverUrl.isNotEmpty
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              playlist.coverUrl,
+                            child: CachedNetworkImage(
+                              imageUrl: playlist.coverUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey[850],
-                                  child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
-                                );
-                              },
+                              width: 200,
+                              height: 200,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[900],
+                                child: const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey[850],
+                                child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
+                              ),
                             ),
                           )
                         : const Icon(Icons.music_note, color: Colors.white54, size: 80),
@@ -122,19 +129,34 @@ class PlaylistDetailScreen extends StatelessWidget {
                 final isPlaying = repo.currentTrack?.id == track.id;
                 
                 return ListTile(
-                  leading: Container(
+                  leading: SizedBox(
                     width: 48,
                     height: 48,
-                    color: Colors.grey[800],
-                    child: track.coverUrl.isNotEmpty 
-                        ? Image.network(
-                            track.coverUrl, 
+                    child: track.coverUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: track.coverUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.wifi_off, color: Colors.white54, size: 24);
-                            },
+                            width: 48,
+                            height: 48,
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey[850],
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: Colors.grey[800],
+                              child: const Icon(Icons.wifi_off, color: Colors.white54, size: 24),
+                            ),
                           )
-                        : const Icon(Icons.music_note, color: Colors.white54),
+                        : Container(
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.music_note, color: Colors.white54),
+                          ),
                   ),
                   title: Text(
                     track.title, 

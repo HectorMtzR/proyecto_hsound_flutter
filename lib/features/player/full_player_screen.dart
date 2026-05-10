@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:palette_generator/palette_generator.dart';
@@ -44,7 +45,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
     try {
       final palette = await PaletteGenerator.fromImageProvider(
-        NetworkImage(track.coverUrl),
+        CachedNetworkImageProvider(track.coverUrl),
         maximumColorCount: 10,
       );
       
@@ -120,16 +121,19 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       )
                     ]
                   ),
-                  child: Image.network(track.coverUrl, fit: BoxFit.cover,
-                  
-                  // --- ESTO ATRAPA EL ERROR VISUAL DE RED ---
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[850],
-                            child: const Icon(Icons.wifi_off, color: Colors.white54, size: 40),
-                          );
-                        },
-                  
+                  child: CachedNetworkImage(
+                    imageUrl: track.coverUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: Colors.grey[900],
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: Colors.grey[850],
+                      child: const Icon(Icons.wifi_off, color: Colors.white54, size: 40),
+                    ),
                   ),
                 ),
               ),

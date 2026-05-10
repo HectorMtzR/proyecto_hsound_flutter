@@ -1,13 +1,16 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth; 
-import 'package:cloud_firestore/cloud_firestore.dart'; 
-import '../models/models.dart';
-import 'dart:io';
-import 'package:minio/minio.dart';
-import 'package:uuid/uuid.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../main.dart' show rootScaffoldMessengerKey;
+import '../models/models.dart';
+import '../services/oci_upload_service.dart';
+import '../utils/app_logger.dart';
 
 /// Repositorio principal de la aplicación.
 ///
@@ -15,6 +18,8 @@ import 'package:just_audio_background/just_audio_background.dart';
 /// la interfaz de usuario con los servicios de Firebase (Auth, Firestore) y Oracle Cloud (OCI).
 /// Gestiona el estado global de reproducción de audio usando [just_audio].
 class MockRepository extends ChangeNotifier {
+  static const String _tag = 'MockRepository';
+
   User? currentUser;
   Track? currentTrack;
   bool isPlaying = false;
@@ -32,6 +37,20 @@ class MockRepository extends ChangeNotifier {
   final _firebaseAuth = firebase_auth.FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
+  // Servicio de subida (inyectable para tests)
+  final OciUploadService _uploadService;
+
+  /// Muestra un SnackBar accionable usando la llave global del messenger.
+  /// No-op si la app aún no montó el messenger.
+  void _notify(String message) {
+    rootScaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   Stream<Duration> get positionStream => _audioPlayer.positionStream;
   Stream<Duration?> get durationStream => _audioPlayer.durationStream;
   Duration get currentDuration => _audioPlayer.duration ?? Duration.zero;
@@ -42,7 +61,8 @@ class MockRepository extends ChangeNotifier {
   List<String> likedTrackIds = []; 
   bool isLoadingTracks = false; 
 
-  MockRepository() {
+  MockRepository({OciUploadService? uploadService})
+      : _uploadService = uploadService ?? OciUploadService() {
     userPlaylists = [
       Playlist(id: 'p_likes', name: 'Tus me gusta', tracks: []),
       Playlist(id: 'p_1', name: 'Mi Mix', tracks: []), 
@@ -110,12 +130,17 @@ class MockRepository extends ChangeNotifier {
         miMix.tracks.clear();
         miMix.tracks.addAll(allTracks.take(10));
       }
-    } catch (_) {
-      // Se omite el log en producción para mantener la consola limpia.
-      // Firestore intentará usar la caché automáticamente.
+    } catch (e, s) {
+      // Firestore intentará servir desde caché; sólo registramos.
+      AppLogger.warn(
+        'No se pudo descargar el catálogo, usando caché',
+        error: e,
+        stack: s,
+        tag: _tag,
+      );
     } finally {
       isLoadingTracks = false;
-      notifyListeners(); 
+      notifyListeners();
     }
   }
 
@@ -146,7 +171,10 @@ class MockRepository extends ChangeNotifier {
             final track = allTracks.firstWhere((t) => t.id == trackId.toString());
             playlistTracks.add(track);
           } catch (_) {
-            // Ignorar referencias huérfanas
+            AppLogger.info(
+              'Referencia huérfana ignorada en playlist: trackId=$trackId',
+              tag: _tag,
+            );
           }
         }
 
@@ -158,8 +186,13 @@ class MockRepository extends ChangeNotifier {
         ));
       }
       notifyListeners();
-    } catch (_) {
-      // Manejo silencioso para usar caché
+    } catch (e, s) {
+      AppLogger.warn(
+        'No se pudieron cargar las playlists, usando caché',
+        error: e,
+        stack: s,
+        tag: _tag,
+      );
     }
   }
 
@@ -185,8 +218,13 @@ class MockRepository extends ChangeNotifier {
 
             notifyListeners();
           }
-        } catch (_) {
-          // Error de red al iniciar, la app usará caché si está disponible
+        } catch (e, s) {
+          AppLogger.warn(
+            'Falló la carga inicial de sesión, usando caché si existe',
+            error: e,
+            stack: s,
+            tag: _tag,
+          );
         }
       } else {
         currentUser = null;
@@ -286,8 +324,14 @@ class MockRepository extends ChangeNotifier {
       );
       
       _audioPlayer.play();
-    } catch (_) {
-      // Falla al cargar el audio, probablemente por red.
+    } catch (e, s) {
+      AppLogger.error(
+        'No se pudo iniciar la reproducción',
+        error: e,
+        stack: s,
+        tag: _tag,
+      );
+      _notify('No se pudo reproducir la canción. Revisa tu conexión.');
     }
   }
 
@@ -348,20 +392,44 @@ class MockRepository extends ChangeNotifier {
       notifyListeners();
       try {
         await userRef.update({'liked_tracks': FieldValue.arrayRemove([track.id])});
-      } catch (_) {}
+      } catch (e, s) {
+        AppLogger.error(
+          'Falló al quitar like de track ${track.id}',
+          error: e,
+          stack: s,
+          tag: _tag,
+        );
+        // Revertimos el estado optimista
+        likedTrackIds.add(track.id);
+        _syncLikesPlaylist();
+        notifyListeners();
+        _notify('No se pudo guardar el like, reintenta cuando tengas conexión.');
+      }
     } else {
       likedTrackIds.add(track.id);
       _syncLikesPlaylist();
       notifyListeners();
       try {
         await userRef.update({'liked_tracks': FieldValue.arrayUnion([track.id])});
-      } catch (_) {}
+      } catch (e, s) {
+        AppLogger.error(
+          'Falló al guardar like de track ${track.id}',
+          error: e,
+          stack: s,
+          tag: _tag,
+        );
+        // Revertimos el estado optimista
+        likedTrackIds.remove(track.id);
+        _syncLikesPlaylist();
+        notifyListeners();
+        _notify('No se pudo guardar el like, reintenta cuando tengas conexión.');
+      }
     }
   }
 
   Future<void> addTrackToPlaylist(String playlistId, Track track) async {
     final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
-    
+
     if (!playlist.tracks.any((t) => t.id == track.id)) {
       playlist.tracks.add(track);
       notifyListeners();
@@ -370,13 +438,24 @@ class MockRepository extends ChangeNotifier {
         await _firestore.collection('playlists').doc(playlistId).update({
           'trackIds': FieldValue.arrayUnion([track.id])
         });
-      } catch (_) {}
+      } catch (e, s) {
+        AppLogger.error(
+          'Falló al agregar track ${track.id} a playlist $playlistId',
+          error: e,
+          stack: s,
+          tag: _tag,
+        );
+        // Revertimos el estado optimista
+        playlist.tracks.removeWhere((t) => t.id == track.id);
+        notifyListeners();
+        _notify('No se pudo agregar la canción a la playlist. Reintenta cuando tengas conexión.');
+      }
     }
   }
 
   Future<void> removeTrackFromPlaylist(String playlistId, Track track) async {
     final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
-    
+
     playlist.tracks.removeWhere((t) => t.id == track.id);
     notifyListeners();
 
@@ -384,69 +463,60 @@ class MockRepository extends ChangeNotifier {
       await _firestore.collection('playlists').doc(playlistId).update({
         'trackIds': FieldValue.arrayRemove([track.id])
       });
-    } catch (_) {}
+    } catch (e, s) {
+      AppLogger.error(
+        'Falló al quitar track ${track.id} de playlist $playlistId',
+        error: e,
+        stack: s,
+        tag: _tag,
+      );
+      // Revertimos el estado optimista
+      if (!playlist.tracks.any((t) => t.id == track.id)) {
+        playlist.tracks.add(track);
+      }
+      notifyListeners();
+      _notify('No se pudo quitar la canción de la playlist. Reintenta cuando tengas conexión.');
+    }
   }
 
-  /// Crea una nueva playlist subiendo primero su portada a Oracle Cloud (OCI).
+  /// Crea una nueva playlist subiendo primero su portada a OCI mediante una
+  /// URL firmada generada por Firebase Functions.
   Future<String> createPlaylistWithImage(String name, File? imageFile) async {
-    if (currentUser == null) throw Exception('No user');;
-    
-    String finalCoverUrl = ''; 
-    final playlistId = const Uuid().v4(); 
+    if (currentUser == null) throw Exception('No user');
+
+    String finalCoverUrl = '';
+    final playlistId = const Uuid().v4();
 
     try {
       if (imageFile != null) {
-        final region = dotenv.env['OCI_REGION'] ?? '';
-        final namespace = dotenv.env['OCI_NAMESPACE'] ?? '';
-        final bucketName = dotenv.env['OCI_BUCKET_NAME'] ?? '';
-        
-        final ociEndpoint = '$namespace.compat.objectstorage.$region.oraclecloud.com';
-
-        final minio = Minio(
-          endPoint: ociEndpoint,
-          accessKey: dotenv.env['OCI_ACCESS_KEY'] ?? '',
-          secretKey: dotenv.env['OCI_SECRET_KEY'] ?? '',
-          useSSL: true, 
-        );
-
-        final extension = imageFile.path.split('.').last;
-        final fileName = 'covers/${DateTime.now().millisecondsSinceEpoch}.$extension';
-        final bytes = await imageFile.readAsBytes();
-        final stream = Stream.value(bytes);
-
-        await minio.putObject(
-          bucketName, 
-          fileName, 
-          stream,
-          size: bytes.length,
-          metadata: {'Content-Type': 'image/$extension'}, 
-        );
-        
-        finalCoverUrl = 'https://objectstorage.$region.oraclecloud.com/n/$namespace/b/$bucketName/o/$fileName';
+        finalCoverUrl = await _uploadService.uploadPlaylistCover(imageFile);
       }
 
       final newPlaylistRef = _firestore.collection('playlists').doc(playlistId);
-      
+
       await newPlaylistRef.set({
         'name': name,
         'ownerId': currentUser!.id,
         'coverUrl': finalCoverUrl,
-        'trackIds': [], 
+        'trackIds': [],
         'createdAt': FieldValue.serverTimestamp(),
       });
 
       userPlaylists.add(Playlist(
-        id: playlistId, 
-        name: name, 
+        id: playlistId,
+        name: name,
         tracks: [],
-        coverUrl: finalCoverUrl
+        coverUrl: finalCoverUrl,
       ));
-      
+
       notifyListeners();
 
       return playlistId;
-
-    } catch (_) {
+    } on UploadException catch (e, s) {
+      AppLogger.error('Falló subida de portada', error: e, stack: s, tag: _tag);
+      throw Exception(e.message);
+    } catch (e, s) {
+      AppLogger.error('Falló crear playlist', error: e, stack: s, tag: _tag);
       throw Exception('Fallo al crear la playlist. Revisa tu conexión.');
     }
   }
@@ -459,7 +529,13 @@ class MockRepository extends ChangeNotifier {
       await _firestore.collection('playlists').doc(playlistId).delete();
       userPlaylists.removeWhere((p) => p.id == playlistId);
       notifyListeners();
-    } catch (_) {
+    } catch (e, s) {
+      AppLogger.error(
+        'Falló eliminar playlist $playlistId',
+        error: e,
+        stack: s,
+        tag: _tag,
+      );
       throw Exception('No se pudo eliminar la playlist por problemas de red.');
     }
   }

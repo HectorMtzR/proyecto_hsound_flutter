@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../mock/mock_repository.dart';
@@ -34,20 +35,30 @@ class MiniPlayer extends StatelessWidget {
         color: Colors.grey[900],
         child: Row(
           children: [
-            // Imagen con manejo de red (Offline Mode)
-            Image.network(
-              track.coverUrl, 
-              width: 64, 
-              height: 64, 
+            // Imagen con caché en disco y manejo de red (Offline Mode)
+            CachedNetworkImage(
+              imageUrl: track.coverUrl,
+              width: 64,
+              height: 64,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: 64,
-                  height: 64,
-                  color: Colors.grey[850],
-                  child: const Icon(Icons.wifi_off, color: Colors.white54, size: 24),
-                );
-              },
+              placeholder: (context, url) => Container(
+                width: 64,
+                height: 64,
+                color: Colors.grey[850],
+                child: const Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                width: 64,
+                height: 64,
+                color: Colors.grey[850],
+                child: const Icon(Icons.wifi_off, color: Colors.white54, size: 24),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

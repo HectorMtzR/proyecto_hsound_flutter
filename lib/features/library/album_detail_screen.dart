@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/mock/mock_repository.dart';
@@ -31,15 +32,19 @@ class AlbumDetailScreen extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               title: Text(albumName, style: const TextStyle(fontWeight: FontWeight.bold)),
               background: firstTrack != null
-                  ? Image.network(
-                      firstTrack.coverUrl, 
+                  ? CachedNetworkImage(
+                      imageUrl: firstTrack.coverUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[850],
-                          child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
-                        );
-                      },
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[900],
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[850],
+                        child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
+                      ),
                     )
                   : const Icon(Icons.album, size: 100, color: Colors.white54),
             ),
