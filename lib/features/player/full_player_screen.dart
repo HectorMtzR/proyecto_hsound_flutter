@@ -146,7 +146,17 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(track.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(track.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          if (repo.isDownloaded(track)) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.download_done, size: 18, color: Colors.greenAccent),
+                          ],
+                        ],
+                      ),
                       Text(track.artist, style: const TextStyle(fontSize: 16, color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ),

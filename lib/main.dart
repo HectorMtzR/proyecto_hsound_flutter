@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
+import 'core/data/local_db.dart';
 import 'core/theme/app_theme.dart';
 import 'core/mock/mock_repository.dart';
 import 'core/router/app_router.dart';
@@ -44,6 +45,11 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Persistencia local (Hive) — necesaria para el modo offline.
+  // Se inicializa después de Firebase para que MockRepository pueda hidratar
+  // desde la caché antes del primer evento de Auth.
+  await LocalDb.init();
 
   runApp(
     ChangeNotifierProvider(

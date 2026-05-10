@@ -172,9 +172,15 @@ class PlaylistDetailScreen extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.more_vert),
-                    onPressed: () => _showOptionsSheet(context, repo, track, playlist.id),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _DownloadButton(track: track),
+                      IconButton(
+                        icon: const Icon(Icons.more_vert),
+                        onPressed: () => _showOptionsSheet(context, repo, track, playlist.id),
+                      ),
+                    ],
                   ),
                   onTap: () => repo.playTrackContext(track, playlist.tracks, playlistId: playlist.id),
                 );
@@ -277,6 +283,63 @@ class PlaylistDetailScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Botón de descarga local de la pista. Cambia entre tres estados:
+/// pendiente, en progreso (spinner) y descargada (palomita verde).
+class _DownloadButton extends StatefulWidget {
+  final Track track;
+  const _DownloadButton({required this.track});
+
+  @override
+  State<_DownloadButton> createState() => _DownloadButtonState();
+}
+
+class _DownloadButtonState extends State<_DownloadButton> {
+  bool _busy = false;
+
+  Future<void> _toggle(MockRepository repo) async {
+    if (_busy) return;
+    final wasDownloaded = repo.isDownloaded(widget.track);
+
+    if (wasDownloaded) {
+      await repo.removeDownload(widget.track);
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await repo.downloadTrack(widget.track);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = context.watch<MockRepository>();
+    final isDownloaded = repo.isDownloaded(widget.track);
+
+    if (_busy) {
+      return const SizedBox(
+        width: 40,
+        height: 40,
+        child: Padding(
+          padding: EdgeInsets.all(10),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    return IconButton(
+      tooltip: isDownloaded ? 'Quitar descarga' : 'Descargar al dispositivo',
+      icon: Icon(
+        isDownloaded ? Icons.download_done : Icons.download_for_offline_outlined,
+        color: isDownloaded ? Colors.greenAccent : Colors.white70,
+      ),
+      onPressed: () => _toggle(repo),
     );
   }
 }

@@ -66,11 +66,21 @@ class MiniPlayer extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    track.title, 
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white), 
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          track.title,
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (repo.isDownloaded(track)) ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.download_done, size: 14, color: Colors.greenAccent),
+                      ],
+                    ],
                   ),
                   Text(
                     track.artist, 
