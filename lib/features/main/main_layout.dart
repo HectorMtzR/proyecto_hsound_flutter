@@ -38,11 +38,16 @@ class MainLayout extends StatelessWidget {
           if (index == 0) context.go('/home');
           if (index == 1) context.go('/search');
           if (index == 2) context.go('/library');
+          // El 4to ítem es de acción: empuja /recognize sobre el stack actual
+          // y al volver el usuario regresa al tab donde estaba. Por eso no se
+          // refleja nunca en _calculateSelectedIndex.
+          if (index == 3) context.push('/recognize');
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
           BottomNavigationBarItem(icon: Icon(Icons.search_outlined), activeIcon: Icon(Icons.search), label: 'Buscar'),
           BottomNavigationBarItem(icon: Icon(Icons.library_music_outlined), activeIcon: Icon(Icons.library_music), label: 'Biblioteca'),
+          BottomNavigationBarItem(icon: Icon(Icons.graphic_eq_outlined), activeIcon: Icon(Icons.graphic_eq), label: 'Reconocer'),
         ],
       ),
     );

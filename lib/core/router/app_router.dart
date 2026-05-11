@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../models/recognition_result.dart';
 import '../mock/mock_repository.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/main/main_layout.dart';
@@ -9,6 +10,8 @@ import '../../features/library/library_screen.dart';
 import '../../features/library/create_playlist_screen.dart';
 import '../../features/library/playlist_detail_screen.dart';
 import '../../features/library/album_detail_screen.dart';
+import '../../features/recognize/recognize_screen.dart';
+import '../../features/recognize/recognition_result_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/settings/info_screen.dart';
 
@@ -91,12 +94,24 @@ GoRouter createRouter(MockRepository repo) {
       
       // Rutas fuera del Shell (Pantallas que ocultan la barra inferior de navegación)
       GoRoute(
-        path: '/settings', 
+        path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
-        path: '/info', 
+        path: '/info',
         builder: (context, state) => const InfoScreen(),
+      ),
+      GoRoute(
+        path: '/recognize',
+        builder: (context, state) => const RecognizeScreen(),
+        routes: [
+          GoRoute(
+            path: 'result',
+            builder: (context, state) => RecognitionResultScreen(
+              result: state.extra as RecognitionResult,
+            ),
+          ),
+        ],
       ),
     ],
   );

@@ -9,6 +9,9 @@ import 'core/data/local_db.dart';
 import 'core/theme/app_theme.dart';
 import 'core/mock/mock_repository.dart';
 import 'core/router/app_router.dart';
+import 'core/services/audio_capture_service.dart';
+import 'core/services/recognition/audd_recognition_service.dart';
+import 'core/services/recognition/recognition_service.dart';
 
 /// Llave global del [ScaffoldMessenger] para emitir SnackBars desde lugares
 /// que no tienen [BuildContext] disponible (p. ej. callbacks de red en el
@@ -52,8 +55,17 @@ Future<void> main() async {
   await LocalDb.init();
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => MockRepository(),
+    MultiProvider(
+      providers: [
+        Provider<AudioCaptureService>(
+          create: (_) => AudioCaptureService(),
+          dispose: (_, service) => service.dispose(),
+        ),
+        Provider<RecognitionService>(
+          create: (_) => AuddRecognitionService(),
+        ),
+        ChangeNotifierProvider(create: (_) => MockRepository()),
+      ],
       child: const HSoundApp(),
     ),
   );
