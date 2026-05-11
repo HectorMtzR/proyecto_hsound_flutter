@@ -5,114 +5,115 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/mock/mock_repository.dart';
 import '../../core/models/models.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/greca_divider.dart';
 
 /// Pantalla de detalles de una lista de reproducción específica.
 ///
 /// Muestra la carátula, el título y la lista de pistas que la componen.
-/// Permite reproducir la lista en modo normal o aleatorio, y ofrece un 
+/// Permite reproducir la lista en modo normal o aleatorio, y ofrece un
 /// menú contextual por canción para gestionar las pistas dentro de la lista.
 class PlaylistDetailScreen extends StatelessWidget {
   /// Identificador único de la playlist a visualizar.
   final String playlistId;
-  
+
   const PlaylistDetailScreen({super.key, required this.playlistId});
 
   @override
   Widget build(BuildContext context) {
     final repo = context.watch<MockRepository>();
-    
+    final textTheme = Theme.of(context).textTheme;
+
     final playlistIndex = repo.userPlaylists.indexWhere((p) => p.id == playlistId);
-    
-    // Fallback visual si la playlist fue borrada o no se encuentra en memoria
+
     if (playlistIndex == -1) {
-      return const Scaffold(
-        body: Center(child: Text('Playlist no encontrada o eliminada'))
+      return Scaffold(
+        body: Center(
+          child: Text('Playlist no encontrada o eliminada', style: textTheme.bodyMedium),
+        ),
       );
     }
-    
+
     final playlist = repo.userPlaylists[playlistIndex];
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back), 
-          onPressed: () => context.go('/library')
-        )
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/library'),
+        ),
       ),
       body: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
             child: Column(
               children: [
                 Center(
                   child: Container(
-                    width: 200, 
+                    width: 200,
                     height: 200,
                     decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(AppRadii.md),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.5), 
-                          blurRadius: 15, 
-                          offset: const Offset(0, 8)
-                        )
+                          color: AppColors.shadowTinted.withValues(alpha: 0.6),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
                       ],
                     ),
                     child: playlist.coverUrl.isNotEmpty
                         ? ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadii.md),
                             child: CachedNetworkImage(
                               imageUrl: playlist.coverUrl,
                               fit: BoxFit.cover,
                               width: 200,
                               height: 200,
                               placeholder: (context, url) => Container(
-                                color: Colors.grey[900],
+                                color: AppColors.surfaceContainerHigh,
                                 child: const Center(
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
                               ),
                               errorWidget: (context, url, error) => Container(
-                                color: Colors.grey[850],
-                                child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
+                                color: AppColors.surfaceContainerHigh,
+                                child: const Icon(Icons.wifi_off, color: AppColors.outline, size: 80),
                               ),
                             ),
                           )
-                        : const Icon(Icons.music_note, color: Colors.white54, size: 80),
+                        : const Icon(Icons.music_note, color: AppColors.outline, size: 80),
                   ),
                 ),
-                
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.lg),
                 Text(
-                  playlist.name, 
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  playlist.name,
+                  style: textTheme.headlineMedium,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 16),
-                
+                Text(
+                  '${playlist.tracks.length} canciones',
+                  style: textTheme.labelSmall,
+                ),
+                const SizedBox(height: AppSpacing.md),
+
                 ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(200, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  ),
-                  icon: const Icon(Icons.shuffle, size: 28),
-                  label: const Text('Aleatorio', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.shuffle, size: 22),
+                  label: const Text('REPRODUCCIÓN ALEATORIA'),
                   onPressed: () {
                     if (playlist.tracks.isNotEmpty) {
                       if (!repo.isShuffle) repo.toggleShuffle();
-                      
+
                       final randomIndex = Random().nextInt(playlist.tracks.length);
                       final randomStartingTrack = playlist.tracks[randomIndex];
                       repo.playTrackContext(randomStartingTrack, playlist.tracks, playlistId: playlist.id);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Esta playlist no tiene canciones aún.'))
+                        const SnackBar(content: Text('Esta playlist no tiene canciones aún.')),
                       );
                     }
                   },
@@ -120,55 +121,63 @@ class PlaylistDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          
+          const GrecaDivider(
+            size: GrecaSize.small,
+            opacity: 0.5,
+            tint: AppColors.brandOrange,
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          ),
           Expanded(
             child: ListView.builder(
               itemCount: playlist.tracks.length,
               itemBuilder: (context, index) {
                 final track = playlist.tracks[index];
                 final isPlaying = repo.currentTrack?.id == track.id;
-                
+
                 return ListTile(
-                  leading: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: track.coverUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: track.coverUrl,
-                            fit: BoxFit.cover,
-                            width: 48,
-                            height: 48,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[850],
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: track.coverUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: track.coverUrl,
+                              fit: BoxFit.cover,
+                              width: 48,
+                              height: 48,
+                              placeholder: (context, url) => Container(
+                                color: AppColors.surfaceContainerHigh,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
                                 ),
                               ),
+                              errorWidget: (context, url, error) => Container(
+                                color: AppColors.surfaceContainerHigh,
+                                child: const Icon(Icons.wifi_off, color: AppColors.outline, size: 24),
+                              ),
+                            )
+                          : Container(
+                              color: AppColors.surfaceContainerHigh,
+                              child: const Icon(Icons.music_note, color: AppColors.outline),
                             ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[800],
-                              child: const Icon(Icons.wifi_off, color: Colors.white54, size: 24),
-                            ),
-                          )
-                        : Container(
-                            color: Colors.grey[800],
-                            child: const Icon(Icons.music_note, color: Colors.white54),
-                          ),
+                    ),
                   ),
                   title: Text(
-                    track.title, 
-                    style: TextStyle(
-                      color: isPlaying ? Colors.redAccent : Colors.white,
-                      fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal
+                    track.title,
+                    style: textTheme.titleSmall?.copyWith(
+                      color: isPlaying ? AppColors.brandOrange : AppColors.onSurface,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     track.artist,
+                    style: textTheme.labelSmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -177,7 +186,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                     children: [
                       _DownloadButton(track: track),
                       IconButton(
-                        icon: const Icon(Icons.more_vert),
+                        icon: const Icon(Icons.more_vert, color: AppColors.onSurfaceVariant),
                         onPressed: () => _showOptionsSheet(context, repo, track, playlist.id),
                       ),
                     ],
@@ -192,53 +201,51 @@ class PlaylistDetailScreen extends StatelessWidget {
     );
   }
 
-  /// Despliega un modal inferior con opciones contextuales para la pista seleccionada.
   void _showOptionsSheet(BuildContext context, MockRepository repo, Track track, String currentPlaylistId) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                margin: const EdgeInsets.only(top: 8, bottom: 16), 
-                width: 40, 
-                height: 4, 
-                decoration: BoxDecoration(color: Colors.grey[600], borderRadius: BorderRadius.circular(2))
+                margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.md),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: AppColors.outline, borderRadius: BorderRadius.circular(2)),
               ),
-              
               ListTile(
-                leading: const Icon(Icons.add_circle_outline, color: Colors.redAccent),
-                title: const Text('Agregar a otra playlist', style: TextStyle(color: Colors.redAccent)),
+                leading: const Icon(Icons.add_circle_outline, color: AppColors.brandOrange),
+                title: Text('Agregar a otra playlist', style: Theme.of(ctx).textTheme.titleSmall),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showPlaylistSelector(context, repo, track);
                 },
               ),
-
               ListTile(
-                leading: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
-                title: const Text('Eliminar de esta playlist', style: TextStyle(color: Colors.redAccent)),
+                leading: const Icon(Icons.remove_circle_outline, color: AppColors.error),
+                title: Text(
+                  'Eliminar de esta playlist',
+                  style: Theme.of(ctx).textTheme.titleSmall?.copyWith(color: AppColors.error),
+                ),
                 onTap: () {
                   repo.removeTrackFromPlaylist(currentPlaylistId, track);
                   Navigator.pop(ctx);
                 },
               ),
-
               ListTile(
-                leading: const Icon(Icons.queue_music, color: Colors.redAccent),
-                title: const Text('Agregar a la fila de reproducción', style: TextStyle(color: Colors.redAccent)),
+                leading: const Icon(Icons.queue_music, color: AppColors.brandTurquoise),
+                title: Text('Agregar a la fila de reproducción', style: Theme.of(ctx).textTheme.titleSmall),
                 onTap: () {
                   repo.addToQueueNext(track);
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Agregada a la fila'))
+                    const SnackBar(content: Text('Agregada a la fila')),
                   );
                 },
               ),
+              const SizedBox(height: AppSpacing.sm),
             ],
           ),
         );
@@ -246,41 +253,42 @@ class PlaylistDetailScreen extends StatelessWidget {
     );
   }
 
-  /// Despliega un menú para agregar la pista a una de las listas personalizadas del usuario.
   void _showPlaylistSelector(BuildContext context, MockRepository repo, Track track) {
-    // Filtramos las listas por defecto del sistema
     final userCreatedPlaylists = repo.userPlaylists.where(
-      (p) => p.id != 'p_likes' && p.id != 'p_1'
+      (p) => p.id != 'p_likes' && p.id != 'p_1',
     ).toList();
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[850],
       builder: (ctx) {
-        return ListView(
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16.0), 
-              child: Text('Selecciona una playlist', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))
-            ),
-            
-            if (userCreatedPlaylists.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('No has creado ninguna playlist personal aún.', style: TextStyle(color: Colors.white54)),
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Text('Selecciona una playlist', style: Theme.of(ctx).textTheme.titleLarge),
               ),
-
-            ...userCreatedPlaylists.map((playlist) => ListTile(
-              title: Text(playlist.name),
-              onTap: () {
-                repo.addTrackToPlaylist(playlist.id, track);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Agregada a ${playlist.name}'))
-                );
-              },
-            )),
-          ],
+              if (userCreatedPlaylists.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Text(
+                    'No has creado ninguna playlist personal aún.',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceVariant),
+                  ),
+                ),
+              ...userCreatedPlaylists.map((playlist) => ListTile(
+                    title: Text(playlist.name, style: Theme.of(ctx).textTheme.titleSmall),
+                    onTap: () {
+                      repo.addTrackToPlaylist(playlist.id, track);
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Agregada a ${playlist.name}')),
+                      );
+                    },
+                  )),
+            ],
+          ),
         );
       },
     );
@@ -288,7 +296,7 @@ class PlaylistDetailScreen extends StatelessWidget {
 }
 
 /// Botón de descarga local de la pista. Cambia entre tres estados:
-/// pendiente, en progreso (spinner) y descargada (palomita verde).
+/// pendiente, en progreso (spinner) y descargada (palomita).
 class _DownloadButton extends StatefulWidget {
   final Track track;
   const _DownloadButton({required this.track});
@@ -337,7 +345,7 @@ class _DownloadButtonState extends State<_DownloadButton> {
       tooltip: isDownloaded ? 'Quitar descarga' : 'Descargar al dispositivo',
       icon: Icon(
         isDownloaded ? Icons.download_done : Icons.download_for_offline_outlined,
-        color: isDownloaded ? Colors.greenAccent : Colors.white70,
+        color: isDownloaded ? AppColors.brandTurquoise : AppColors.onSurfaceVariant,
       ),
       onPressed: () => _toggle(repo),
     );

@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../core/mock/mock_repository.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Pantalla de detalles de un álbum específico.
 ///
-/// Muestra la portada del álbum en un [SliverAppBar] que se encoge 
-/// dinámicamente al hacer scroll. Lista todas las pistas agrupadas 
+/// Muestra la portada del álbum en un [SliverAppBar] que se encoge
+/// dinámicamente al hacer scroll. Lista todas las pistas agrupadas
 /// bajo este álbum y permite su reproducción en contexto continuo.
 class AlbumDetailScreen extends StatelessWidget {
   /// Nombre del álbum a mostrar. Se utiliza como llave para filtrar el catálogo.
@@ -17,39 +19,68 @@ class AlbumDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = context.watch<MockRepository>();
-    
+    final textTheme = Theme.of(context).textTheme;
+
     final albumTracks = repo.groupedByAlbum[albumName] ?? [];
     final firstTrack = albumTracks.isNotEmpty ? albumTracks.first : null;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 300,
             pinned: true,
-            backgroundColor: Colors.grey[900],
+            backgroundColor: AppColors.surface,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(albumName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              background: firstTrack != null
-                  ? CachedNetworkImage(
+              title: Text(
+                albumName,
+                style: GoogleFonts.almendra(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.onSurface,
+                ),
+              ),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (firstTrack != null)
+                    CachedNetworkImage(
                       imageUrl: firstTrack.coverUrl,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
-                        color: Colors.grey[900],
+                        color: AppColors.surfaceContainerHigh,
                         child: const Center(
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       ),
                       errorWidget: (context, url, error) => Container(
-                        color: Colors.grey[850],
-                        child: const Icon(Icons.wifi_off, color: Colors.white54, size: 80),
+                        color: AppColors.surfaceContainerHigh,
+                        child: const Icon(Icons.wifi_off, color: AppColors.outline, size: 80),
                       ),
                     )
-                  : const Icon(Icons.album, size: 100, color: Colors.white54),
+                  else
+                    Container(
+                      color: AppColors.surfaceContainerHigh,
+                      child: const Icon(Icons.album, size: 100, color: AppColors.outline),
+                    ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          AppColors.background.withValues(alpha: 0.95),
+                        ],
+                        stops: const [0.4, 1.0],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
@@ -57,15 +88,21 @@ class AlbumDetailScreen extends StatelessWidget {
                 final isPlaying = repo.currentTrack?.id == track.id;
 
                 return ListTile(
-                  leading: Text('${index + 1}', style: const TextStyle(color: Colors.white54)),
-                  title: Text(
-                    track.title,
-                    style: TextStyle(
-                      color: isPlaying ? Colors.redAccent : Colors.white,
-                      fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+                  leading: SizedBox(
+                    width: 28,
+                    child: Text(
+                      '${index + 1}',
+                      style: textTheme.labelLarge?.copyWith(color: AppColors.outline),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                  subtitle: Text(track.artist, style: const TextStyle(color: Colors.white54)),
+                  title: Text(
+                    track.title,
+                    style: textTheme.titleSmall?.copyWith(
+                      color: isPlaying ? AppColors.brandOrange : AppColors.onSurface,
+                    ),
+                  ),
+                  subtitle: Text(track.artist, style: textTheme.labelSmall),
                   onTap: () => repo.playTrackContext(track, albumTracks),
                 );
               },

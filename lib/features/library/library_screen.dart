@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/mock/mock_repository.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Pantalla de Biblioteca Principal del usuario.
 ///
@@ -15,43 +16,41 @@ class LibraryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = context.watch<MockRepository>();
+    final textTheme = Theme.of(context).textTheme;
 
     return DefaultTabController(
-      length: 2, 
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Tu Biblioteca'),
-          backgroundColor: Colors.grey[900],
           actions: [
             IconButton(
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add, color: AppColors.brandOrange),
               onPressed: () => context.push('/library/create'),
             ),
           ],
           bottom: const TabBar(
-            indicatorColor: Colors.redAccent, 
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white54,
+            indicatorWeight: 3,
             tabs: [
               Tab(text: 'Playlists'),
               Tab(text: 'Álbumes'),
             ],
           ),
         ),
-        
         body: TabBarView(
           children: [
             // --- VISTA 1: TUS PLAYLISTS ---
-            ListView.builder(
-              padding: const EdgeInsets.all(16),
+            ListView.separated(
+              padding: const EdgeInsets.all(AppSpacing.md),
               itemCount: repo.userPlaylists.length,
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
                 final playlist = repo.userPlaylists[index];
-                
+
                 return ListTile(
-                  contentPadding: const EdgeInsets.only(bottom: 16),
+                  contentPadding: EdgeInsets.zero,
                   leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(AppRadii.md),
                     child: SizedBox(
                       width: 56,
                       height: 56,
@@ -60,7 +59,7 @@ class LibraryScreen extends StatelessWidget {
                               imageUrl: playlist.coverUrl,
                               fit: BoxFit.cover,
                               placeholder: (context, url) => Container(
-                                color: Colors.grey[850],
+                                color: AppColors.surfaceContainerHigh,
                                 child: const Center(
                                   child: SizedBox(
                                     width: 16,
@@ -70,53 +69,54 @@ class LibraryScreen extends StatelessWidget {
                                 ),
                               ),
                               errorWidget: (context, url, error) => Container(
-                                color: Colors.grey[800],
-                                child: const Icon(Icons.music_note, color: Colors.white54),
+                                color: AppColors.surfaceContainerHigh,
+                                child: const Icon(Icons.music_note, color: AppColors.outline),
                               ),
                             )
                           : Container(
-                              color: Colors.grey[800],
-                              child: const Icon(Icons.music_note, color: Colors.white54),
+                              color: AppColors.surfaceContainerHigh,
+                              child: const Icon(Icons.music_note, color: AppColors.outline),
                             ),
                     ),
                   ),
-                  title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                  subtitle: Text('${playlist.tracks.length} canciones', style: const TextStyle(color: Colors.white54)),
+                  title: Text(playlist.name, style: textTheme.titleSmall),
+                  subtitle: Text('${playlist.tracks.length} canciones', style: textTheme.labelSmall),
                   onTap: () => context.push('/library/playlist/${playlist.id}'),
                   onLongPress: () {
-                    // Candado de seguridad para proteger entidades del sistema
                     final nameLower = playlist.name.toLowerCase();
                     if (nameLower.contains('me gusta') || nameLower.contains('mix')) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('No puedes eliminar las playlists del sistema'),
-                          backgroundColor: Colors.redAccent,
                         ),
                       );
-                      return; 
+                      return;
                     }
 
-                    // Diálogo de confirmación para eliminar
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        backgroundColor: Colors.grey[900],
-                        title: const Text('Eliminar Playlist', style: TextStyle(color: Colors.white)),
-                        content: Text('¿Seguro que quieres eliminar "${playlist.name}"?', style: const TextStyle(color: Colors.white70)),
+                        backgroundColor: AppColors.surfaceContainerHigh,
+                        title: Text('Eliminar Playlist', style: textTheme.titleLarge),
+                        content: Text(
+                          '¿Seguro que quieres eliminar "${playlist.name}"?',
+                          style: textTheme.bodyMedium?.copyWith(color: AppColors.onSurfaceVariant),
+                        ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx),
-                            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+                            child: const Text('Cancelar'),
                           ),
                           TextButton(
+                            style: TextButton.styleFrom(foregroundColor: AppColors.error),
                             onPressed: () {
-                              repo.deletePlaylist(playlist.id); 
+                              repo.deletePlaylist(playlist.id);
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Playlist eliminada')),
                               );
                             },
-                            child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+                            child: const Text('Eliminar'),
                           ),
                         ],
                       ),
@@ -128,12 +128,12 @@ class LibraryScreen extends StatelessWidget {
 
             // --- VISTA 2: ÁLBUMES EN CUADRÍCULA ---
             GridView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.md),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, 
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.7, 
+                crossAxisCount: 2,
+                crossAxisSpacing: AppSpacing.md,
+                mainAxisSpacing: AppSpacing.md,
+                childAspectRatio: 0.7,
               ),
               itemCount: repo.groupedByAlbum.length,
               itemBuilder: (context, index) {
@@ -150,38 +150,47 @@ class LibraryScreen extends StatelessWidget {
                         aspectRatio: 1,
                         child: Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: Colors.grey[850],
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                            border: Border.all(color: AppColors.outlineVariant, width: 1),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.shadowTinted.withValues(alpha: 0.4),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          // Implementación de imagen con escudo de red
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadii.md),
                             child: CachedNetworkImage(
                               imageUrl: firstTrack.coverUrl,
                               fit: BoxFit.cover,
                               placeholder: (context, url) => Container(
-                                color: Colors.grey[900],
+                                color: AppColors.surfaceContainerHigh,
                                 child: const Center(
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
                               ),
-                              errorWidget: (context, url, error) => const Center(
-                                child: Icon(Icons.wifi_off, color: Colors.white54, size: 40),
+                              errorWidget: (context, url, error) => Container(
+                                color: AppColors.surfaceContainerHigh,
+                                child: const Center(
+                                  child: Icon(Icons.wifi_off, color: AppColors.outline, size: 40),
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
                         albumName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        style: textTheme.titleSmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         firstTrack.artist,
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        style: textTheme.labelSmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

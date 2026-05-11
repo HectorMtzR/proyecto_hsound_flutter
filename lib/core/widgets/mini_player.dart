@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../mock/mock_repository.dart';
+import '../theme/app_theme.dart';
 import '../../features/player/full_player_screen.dart';
 
 /// Reproductor minimizado (MiniPlayer) persistente.
@@ -15,52 +16,62 @@ class MiniPlayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = context.watch<MockRepository>();
-    
-    // Si no hay ninguna pista seleccionada, el reproductor simplemente se oculta.
+
     if (repo.currentTrack == null) return const SizedBox.shrink();
 
     final track = repo.currentTrack!;
-    
+
     return GestureDetector(
       onTap: () {
         showModalBottomSheet(
           context: context,
-          isScrollControlled: true, 
+          isScrollControlled: true,
           useSafeArea: true,
+          backgroundColor: Colors.transparent,
           builder: (context) => const FullPlayerScreen(),
         );
       },
       child: Container(
         height: 64,
-        color: Colors.grey[900],
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceContainer,
+          border: Border(
+            top: BorderSide(color: AppColors.outlineVariant, width: 1),
+          ),
+        ),
         child: Row(
           children: [
-            // Imagen con caché en disco y manejo de red (Offline Mode)
-            CachedNetworkImage(
-              imageUrl: track.coverUrl,
-              width: 64,
-              height: 64,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(AppRadii.sm),
+                bottomLeft: Radius.circular(AppRadii.sm),
+              ),
+              child: CachedNetworkImage(
+                imageUrl: track.coverUrl,
                 width: 64,
                 height: 64,
-                color: Colors.grey[850],
-                child: const Center(
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  width: 64,
+                  height: 64,
+                  color: AppColors.surfaceContainerHigh,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   ),
                 ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                width: 64,
-                height: 64,
-                color: Colors.grey[850],
-                child: const Icon(Icons.wifi_off, color: Colors.white54, size: 24),
+                errorWidget: (context, url, error) => Container(
+                  width: 64,
+                  height: 64,
+                  color: AppColors.surfaceContainerHigh,
+                  child: const Icon(Icons.wifi_off, color: AppColors.outline, size: 24),
+                ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,20 +82,20 @@ class MiniPlayer extends StatelessWidget {
                       Flexible(
                         child: Text(
                           track.title,
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                          style: Theme.of(context).textTheme.titleSmall,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (repo.isDownloaded(track)) ...[
                         const SizedBox(width: 6),
-                        const Icon(Icons.download_done, size: 14, color: Colors.greenAccent),
+                        const Icon(Icons.download_done, size: 14, color: AppColors.brandTurquoise),
                       ],
                     ],
                   ),
                   Text(
-                    track.artist, 
-                    style: const TextStyle(color: Colors.white70, fontSize: 12), 
+                    track.artist,
+                    style: Theme.of(context).textTheme.labelSmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -92,10 +103,14 @@ class MiniPlayer extends StatelessWidget {
               ),
             ),
             IconButton(
-              icon: Icon(repo.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
+              icon: Icon(
+                repo.isPlaying ? Icons.pause : Icons.play_arrow,
+                color: AppColors.brandOrange,
+                size: 28,
+              ),
               onPressed: repo.togglePlay,
             ),
-            const SizedBox(width: 8), // Pequeño margen derecho para estética
+            const SizedBox(width: AppSpacing.sm),
           ],
         ),
       ),

@@ -37,8 +37,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/logo_hsound.png
+    - assets/grecas/
 
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/logo_hsound.png" # <-- La ruta a tu imagen
+  image_path: "assets/logo_hsound.png"
