@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/mock/mock_repository.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/greca_divider.dart';
+import 'widgets/regional_section.dart';
 
 /// Pantalla principal (Inicio) de la aplicación.
 ///
@@ -29,93 +30,101 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          const GrecaDivider(
-            size: GrecaSize.small,
-            opacity: 0.6,
-            tint: AppColors.brandOrange,
-            padding: EdgeInsets.only(bottom: AppSpacing.sm),
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(
+            child: GrecaDivider(
+              size: GrecaSize.small,
+              opacity: 0.6,
+              tint: AppColors.brandOrange,
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
+            ),
           ),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(AppSpacing.md),
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: AppSpacing.md,
                 mainAxisSpacing: AppSpacing.md,
                 childAspectRatio: 0.75,
               ),
-              itemCount: repo.allTracks.length,
-              itemBuilder: (context, index) {
-                final track = repo.allTracks[index];
-                final isPlaying = repo.currentTrack?.id == track.id;
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final track = repo.allTracks[index];
+                  final isPlaying = repo.currentTrack?.id == track.id;
 
-                return GestureDetector(
-                  onTap: () => repo.playTrackContext(track, repo.allTracks),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AspectRatio(
-                        aspectRatio: 1,
-                        child: Hero(
-                          tag: 'track_cover_${track.id}',
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              border: isPlaying
-                                  ? Border.all(color: AppColors.brandOrange, width: 2)
-                                  : Border.all(color: AppColors.outlineVariant, width: 1),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.shadowTinted.withValues(alpha: 0.5),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(AppRadii.md),
-                              child: CachedNetworkImage(
-                                imageUrl: track.coverUrl,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                placeholder: (context, url) => Container(
-                                  color: AppColors.surfaceContainerHigh,
-                                  child: const Center(
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                  return GestureDetector(
+                    onTap: () => repo.playTrackContext(track, repo.allTracks),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 1,
+                          child: Hero(
+                            tag: 'track_cover_${track.id}',
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                border: isPlaying
+                                    ? Border.all(color: AppColors.brandOrange, width: 2)
+                                    : Border.all(color: AppColors.outlineVariant, width: 1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.shadowTinted.withValues(alpha: 0.5),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
                                   ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: AppColors.surfaceContainerHigh,
-                                  child: const Icon(Icons.wifi_off, color: AppColors.outline, size: 40),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                child: CachedNetworkImage(
+                                  imageUrl: track.coverUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  placeholder: (context, url) => Container(
+                                    color: AppColors.surfaceContainerHigh,
+                                    child: const Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: AppColors.surfaceContainerHigh,
+                                    child: const Icon(Icons.wifi_off, color: AppColors.outline, size: 40),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        track.title,
-                        style: textTheme.titleSmall?.copyWith(
-                          color: isPlaying ? AppColors.brandOrange : AppColors.onSurface,
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          track.title,
+                          style: textTheme.titleSmall?.copyWith(
+                            color: isPlaying ? AppColors.brandOrange : AppColors.onSurface,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        track.artist,
-                        style: textTheme.labelSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                );
-              },
+                        Text(
+                          track.artist,
+                          style: textTheme.labelSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                childCount: repo.allTracks.length,
+              ),
             ),
           ),
+          SliverToBoxAdapter(
+            child: RegionalSection(playlists: repo.regionalPlaylists),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
         ],
       ),
     );

@@ -187,25 +187,10 @@ class LocalRepository {
 
   // --- Helpers de serialización ---
 
-  Map<String, dynamic> _trackToMap(Track t) => {
-        'id': t.id,
-        'title': t.title,
-        'artist': t.artist,
-        'album': t.album,
-        'coverUrl': t.coverUrl,
-        'audioUrl': t.audioUrl,
-        'duration': t.duration,
-      };
+  Map<String, dynamic> _trackToMap(Track t) => t.toMap();
 
-  Track _trackFromMap(Map<String, dynamic> m) => Track(
-        id: m['id'] as String,
-        title: (m['title'] as String?) ?? 'Sin título',
-        artist: (m['artist'] as String?) ?? 'Artista desconocido',
-        album: (m['album'] as String?) ?? 'Sencillo',
-        coverUrl: (m['coverUrl'] as String?) ?? '',
-        audioUrl: (m['audioUrl'] as String?) ?? '',
-        duration: (m['duration'] as String?) ?? '0:00',
-      );
+  Track _trackFromMap(Map<String, dynamic> m) =>
+      Track.fromMap(m, m['id'] as String);
 
   Map<String, dynamic> _playlistToMap(Playlist p) => {
         'id': p.id,

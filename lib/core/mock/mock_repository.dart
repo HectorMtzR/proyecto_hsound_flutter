@@ -13,7 +13,9 @@ import '../data/local_db.dart';
 import '../data/local_repository.dart';
 import '../data/remote_repository.dart';
 import '../models/models.dart';
+import '../models/regional_playlist.dart';
 import '../services/oci_upload_service.dart';
+import '../services/regional_playlist_service.dart';
 import '../utils/app_logger.dart';
 
 /// Fachada offline-first sobre [LocalRepository] (Hive),
@@ -55,6 +57,7 @@ class MockRepository extends ChangeNotifier {
   final RemoteRepository _remote;
   final ConnectivityWatcher _connectivity;
   final DownloadService _downloads;
+  final RegionalPlaylistService _regionalService = RegionalPlaylistService();
 
   MockRepository({
     OciUploadService? uploadService,
@@ -102,6 +105,35 @@ class MockRepository extends ChangeNotifier {
       albumMap.putIfAbsent(track.album, () => []).add(track);
     }
     return albumMap;
+  }
+
+  /// Playlists regionales destacadas, generadas en runtime a partir del
+  /// catálogo actual. Vacía si ningún track tiene metadata regional.
+  List<RegionalPlaylist> get regionalPlaylists =>
+      _regionalService.getFeaturedRegionalPlaylists(allTracks);
+
+  /// Decora los primeros tracks del catálogo con metadata regional para que
+  /// la sección "Música Regional" sea visible sin tocar Firestore. Cada par
+  /// comparte género/región para que cumpla el mínimo de 2 tracks por grupo.
+  List<Track> _withRegionalSeed(List<Track> fetched) {
+    if (fetched.length < 4) return fetched;
+    const seed = <Map<String, String>>[
+      {'genre': 'Son Jarocho', 'region': 'Veracruz', 'language': 'Español'},
+      {'genre': 'Son Jarocho', 'region': 'Veracruz', 'language': 'Español'},
+      {'genre': 'Música Zapoteca', 'region': 'Oaxaca', 'language': 'Zapoteco'},
+      {'genre': 'Música Zapoteca', 'region': 'Oaxaca', 'language': 'Zapoteco'},
+    ];
+    return [
+      for (var i = 0; i < fetched.length; i++)
+        if (i < seed.length)
+          fetched[i].copyWith(
+            genre: seed[i]['genre'],
+            region: seed[i]['region'],
+            language: seed[i]['language'],
+          )
+        else
+          fetched[i],
+    ];
   }
 
   // --- Estado de autenticación ---
@@ -162,7 +194,7 @@ class MockRepository extends ChangeNotifier {
 
       final fetched = await _remote.fetchTracks();
       if (fetched.isNotEmpty) {
-        allTracks = fetched;
+        allTracks = _withRegionalSeed(fetched);
         await _local.cacheTracks(allTracks);
         final miMix = userPlaylists.firstWhere((p) => p.id == 'p_1');
         miMix.tracks
@@ -195,7 +227,7 @@ class MockRepository extends ChangeNotifier {
     try {
       final fetched = await _remote.fetchTracks();
       if (fetched.isNotEmpty) {
-        allTracks = fetched;
+        allTracks = _withRegionalSeed(fetched);
         await _local.cacheTracks(allTracks);
         final miMix = userPlaylists.firstWhere((p) => p.id == 'p_1');
         miMix.tracks

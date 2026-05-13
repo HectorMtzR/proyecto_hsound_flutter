@@ -87,18 +87,7 @@ class RemoteRepository {
 
   Future<List<Track>> fetchTracks() async {
     final snapshot = await _firestore.collection('tracks').get();
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      return Track(
-        id: doc.id,
-        title: data['title'] ?? 'Sin título',
-        artist: data['artist'] ?? 'Artista desconocido',
-        album: data['album'] ?? 'Sencillo',
-        coverUrl: data['coverUrl'] ?? '',
-        audioUrl: data['audioUrl'] ?? '',
-        duration: data['duration'] ?? '0:00',
-      );
-    }).toList();
+    return snapshot.docs.map(Track.fromFirestore).toList();
   }
 
   Future<List<Playlist>> fetchUserPlaylists(

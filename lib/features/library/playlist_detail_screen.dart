@@ -25,22 +25,32 @@ class PlaylistDetailScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final playlistIndex = repo.userPlaylists.indexWhere((p) => p.id == playlistId);
+    Playlist? resolved;
+    if (playlistIndex != -1) {
+      resolved = repo.userPlaylists[playlistIndex];
+    } else {
+      for (final regional in repo.regionalPlaylists) {
+        if (regional.id == playlistId) {
+          resolved = regional.toPlaylist();
+          break;
+        }
+      }
+    }
 
-    if (playlistIndex == -1) {
+    if (resolved == null) {
       return Scaffold(
         body: Center(
           child: Text('Playlist no encontrada o eliminada', style: textTheme.bodyMedium),
         ),
       );
     }
-
-    final playlist = repo.userPlaylists[playlistIndex];
+    final playlist = resolved;
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/library'),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/library'),
         ),
       ),
       body: Column(
