@@ -23,6 +23,9 @@ class LocalDb {
   /// Mapa `trackId → ruta absoluta del archivo MP3 descargado`.
   static const downloadsBox = 'downloads';
 
+  /// Caché de descubrimiento musical: `{results: [...], cachedAt: String}`.
+  static const discoveryBox = 'discovery_cache';
+
   static Future<void> init() async {
     await Hive.initFlutter();
     await Future.wait([
@@ -31,6 +34,7 @@ class LocalDb {
       Hive.openBox(likedTracksBox),
       Hive.openBox(pendingWritesBox),
       Hive.openBox(downloadsBox),
+      Hive.openBox(discoveryBox),
     ]);
   }
 

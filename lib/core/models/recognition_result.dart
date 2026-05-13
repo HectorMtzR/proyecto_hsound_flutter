@@ -86,6 +86,32 @@ class RecognitionResult {
     return null;
   }
 
+  Map<String, dynamic> toMap() => {
+        'title': title,
+        'artist': artist,
+        if (album != null) 'album': album,
+        if (isrc != null) 'isrc': isrc,
+        if (spotifyId != null) 'spotifyId': spotifyId,
+        if (appleMusicId != null) 'appleMusicId': appleMusicId,
+        if (releaseDate != null) 'releaseDate': releaseDate,
+        if (coverUrl != null) 'coverUrl': coverUrl,
+        'source': source.name,
+      };
+
+  factory RecognitionResult.fromMap(Map<dynamic, dynamic> data) =>
+      RecognitionResult(
+        title: data['title'] as String,
+        artist: data['artist'] as String,
+        album: data['album'] as String?,
+        isrc: data['isrc'] as String?,
+        spotifyId: data['spotifyId'] as String?,
+        appleMusicId: data['appleMusicId'] as String?,
+        releaseDate: data['releaseDate'] as String?,
+        coverUrl: data['coverUrl'] as String?,
+        source: RecognitionSource.values
+            .byName((data['source'] as String?) ?? 'external'),
+      );
+
   /// Año extraído de [releaseDate] si está disponible.
   String? get releaseYear {
     final d = releaseDate;

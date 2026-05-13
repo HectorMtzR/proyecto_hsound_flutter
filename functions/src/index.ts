@@ -220,3 +220,68 @@ export const recognizeAudio = onRequest(
     });
   },
 );
+
+export const discoverByGenre = onRequest(
+  {
+    region: "us-central1",
+    secrets: [AUDD_API_TOKEN],
+    timeoutSeconds: 20,
+    memory: "256MiB",
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const authHeader = req.get("authorization") ?? req.get("Authorization") ?? "";
+    const match = authHeader.match(/^Bearer (.+)$/i);
+    if (!match) {
+      res.status(401).json({ error: "Falta el token de autenticación." });
+      return;
+    }
+    try {
+      await getAuth().verifyIdToken(match[1]);
+    } catch (e) {
+      res.status(401).json({ error: "Token inválido o expirado." });
+      return;
+    }
+
+    const body = (req.body ?? {}) as { genres?: unknown };
+    if (!Array.isArray(body.genres) || body.genres.length === 0) {
+      res.status(400).json({ error: "genres[] requerido." });
+      return;
+    }
+
+    const raw: unknown[] = [];
+    for (const genre of (body.genres as string[]).slice(0, 5)) {
+      try {
+        const form = new FormData();
+        form.append("api_token", AUDD_API_TOKEN.value());
+        form.append("q", String(genre));
+        form.append("return", "spotify,apple_music");
+        const r = await fetch("https://api.audd.io/", { method: "POST", body: form });
+        if (!r.ok) continue;
+        const payload = (await r.json()) as { status?: string; result?: unknown };
+        if (payload.status === "success" && payload.result) {
+          raw.push(payload.result);
+        }
+      } catch {
+        // continuar con el siguiente género
+      }
+    }
+
+    const seen = new Set<string>();
+    const results = raw
+      .filter((r) => {
+        const item = r as Record<string, unknown>;
+        const key = `${item["title"]}|${item["artist"]}`.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 10);
+
+    res.status(200).json({ status: "success", results });
+  },
+);
